@@ -133,13 +133,21 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* 
+          Demo Access Buttons are provided for hackathon evaluation only 
+          and would be disabled in production deployments.
+        */}
         {/* Demo Roles Shortcut Panel */}
         <div className="mt-6 pt-5 border-t border-cyber-border/40">
-          <p className="text-[9px] uppercase tracking-widest text-cyber-gray text-center mb-3">
-            -- DEV PROFILE QUICK AUTHENTICATORS --
+          <p className="text-[10px] uppercase tracking-widest text-cyber-cyan text-center mb-1 font-bold">
+            HACKATHON DEMO ACCESS
+          </p>
+          <p className="text-[9px] text-cyber-gray text-center mb-4">
+            Instantly explore Admin, Analyst, and Viewer experiences.
           </p>
           <div className="grid grid-cols-3 gap-2">
             <button
+              type="button"
               onClick={() => triggerDemoLogin('admin')}
               className="py-2 border border-cyber-red/35 bg-cyber-red/5 hover:bg-cyber-red/20 text-cyber-red rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
@@ -148,6 +156,7 @@ export default function LoginPage() {
             </button>
 
             <button
+              type="button"
               onClick={() => triggerDemoLogin('analyst')}
               className="py-2 border border-cyber-cyan/35 bg-cyber-cyan/5 hover:bg-cyber-cyan/20 text-cyber-cyan rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
@@ -156,6 +165,7 @@ export default function LoginPage() {
             </button>
 
             <button
+              type="button"
               onClick={() => triggerDemoLogin('viewer')}
               className="py-2 border border-cyber-gray/35 bg-cyber-gray/5 hover:bg-cyber-gray/20 text-cyber-gray rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
