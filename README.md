@@ -22,6 +22,15 @@ Security Operations Centers (SOCs) are overwhelmed by an exponential volume of r
 
 ---
 
+## 🔁 How Splunk Fits Into The Workflow
+- **Splunk generates and stores security telemetry**: Splunk indexers actively compile authorization logs, web server traces, system shell metrics, and network packets from enterprise assets.
+- **Splunk Sentinel consumes Splunk-generated events**: Raw event alerts are streamed from Splunk Cloud/Enterprise indices directly to Sentinel’s analysis pipeline.
+- **AI analyzes incidents**: The AI Threat Analysis Engine extracts key IOC metrics (attacks vector, timeline, signatures) and calculates a severity score.
+- **Analysts interact through the Sentinel Coprocessor**: Incident responders converse directly with the context-aware chatbot to investigate details or retrieve SPL query help.
+- **AI generates remediation plans and reports**: Sentinel automatically compiles step-by-step containment checklists and exports C-suite restricted PDF reports.
+
+---
+
 ## 🛠️ Features
 - **📊 Operational SOC Dashboard**: Highlights key metric cards (Total Scanned, Critical Alerts, Active cases, Mitigated rate) and threat vector distribution.
 - **🔍 Intelligent Log Analyzer**: Drag-and-drop log uploader and code editor with preset logs loaders.

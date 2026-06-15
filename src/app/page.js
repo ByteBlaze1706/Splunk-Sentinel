@@ -919,7 +919,7 @@ export default function Home() {
             }`}
           >
             <Database className="w-4 h-4" />
-            <span className="hidden sm:inline md:inline">Splunk MCP Link</span>
+            <span className="hidden sm:inline md:inline">Splunk Integration</span>
           </button>
 
           <button 
@@ -1373,14 +1373,22 @@ export default function Home() {
               <div className="border-b border-cyber-border/40 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold font-mono text-white tracking-wide flex items-center gap-2">
-                    <Database className="w-6 h-6 text-cyber-cyan" /> SPLUNK MCP INTEGRATION
+                    <Database className="w-6 h-6 text-cyber-cyan" /> SPLUNK INTEGRATION
                   </h2>
                   <p className="text-xs text-cyber-gray mt-1 font-mono">
                     Connect Sentinel AI directly to your Splunk Indexes using the Model Context Protocol (MCP).
                   </p>
                 </div>
-                <div className="px-3 py-1.5 border border-cyber-cyan/30 bg-cyber-cyan/5 text-cyber-cyan rounded text-[10px] font-mono font-bold tracking-wider">
-                  DESIGNED FOR SPLUNK MCP
+                <div className="flex gap-2 flex-wrap">
+                  <span className="px-2 py-1 border border-cyber-green/30 bg-cyber-green/5 text-cyber-green rounded text-[9px] font-mono font-bold tracking-wider animate-pulse">
+                    SPLUNK ENTERPRISE READY
+                  </span>
+                  <span className="px-2 py-1 border border-cyber-green/30 bg-cyber-green/5 text-cyber-green rounded text-[9px] font-mono font-bold tracking-wider animate-pulse">
+                    SPLUNK CLOUD READY
+                  </span>
+                  <span className="px-2 py-1 border border-cyber-cyan/30 bg-cyber-cyan/5 text-cyber-cyan rounded text-[9px] font-mono font-bold tracking-wider">
+                    DESIGNED FOR SPLUNK MCP
+                  </span>
                 </div>
               </div>
 
