@@ -22,7 +22,7 @@
   <g transform="translate(150, 140)">
     <path d="M150,20 L240,60 C240,165 150,240 150,240 C150,240 60,165 60,60 Z" fill="#0a0f1d" stroke="url(#cyanGrad)" stroke-width="8" filter="url(#glow)" />
     <!-- Stylized letter S inside -->
-    <path d="M180,90 C165,75 135,75 120,90 C105,105 114,123 135,129 C156,135 165,147 156,165 C144,183 114,180 105,165" fill="none" stroke="#00f0ff" stroke-width="16" stroke-linecap="round" filter="url(#glow-text)"/>
+    <path d="M 170,95 C 170,78 130,78 130,98 C 130,118 170,118 170,138 C 170,158 130,158 130,151" fill="none" stroke="#00f0ff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow-text)"/>
   </g>
 
   <!-- Title & Branding (Right) -->

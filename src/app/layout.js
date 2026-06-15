@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "Splunk Sentinel",
-  description: "AI-Powered Security Operations Copilot for Threat Detection, Incident Investigation, and Automated Response.",
+  description: "AI-Powered Security Operations Copilot",
   keywords: [
     "Cybersecurity",
     "Splunk",
