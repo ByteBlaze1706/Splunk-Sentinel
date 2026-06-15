@@ -172,17 +172,6 @@ export const signInUser = async (email, password) => {
   return { data: foundUser };
 };
 
-export const signInDemoUser = async (role) => {
-  const emailMap = {
-    admin: DEMO_ADMIN_EMAIL,
-    analyst: DEMO_ANALYST_EMAIL,
-    viewer: DEMO_VIEWER_EMAIL
-  };
-  const email = emailMap[role.toLowerCase()];
-  if (!email) return { error: { message: 'Invalid email or password.' } };
-  return signInUser(email, 'password123');
-};
-
 export const signOutUser = async () => {
   if (!useMock) {
     await supabase.auth.signOut();
