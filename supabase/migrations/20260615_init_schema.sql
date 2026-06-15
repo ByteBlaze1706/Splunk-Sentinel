@@ -80,7 +80,7 @@ CREATE POLICY "Allow authenticated insert to audit_logs" ON public.audit_logs FO
 
 -- 6. Insert Default Seed Data (For clean boots)
 INSERT INTO public.users (email, full_name, role) VALUES
-('admin@sentinel.local', 'Devayani (Admin)', 'Admin'),
-('analyst@sentinel.local', 'John Analyst', 'Security Analyst'),
-('viewer@sentinel.local', 'Sarah Viewer', 'Viewer')
+('admin@splunksentinel.local', 'Devayani (Admin)', 'Admin'),
+('analyst@splunksentinel.local', 'John Analyst', 'Security Analyst'),
+('viewer@splunksentinel.local', 'Sarah Viewer', 'Viewer')
 ON CONFLICT (email) DO NOTHING;

@@ -95,7 +95,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="analyst@sentinel.local"
+                placeholder="analyst@splunksentinel.local"
                 className="w-full p-2.5 pl-3 bg-cyber-bg border border-cyber-border rounded text-xs text-cyber-cyan focus:outline-none focus:border-cyber-cyan focus:shadow-cyan-glow"
               />
             </div>
@@ -140,7 +140,7 @@ export default function LoginPage() {
           </p>
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => triggerDemoLogin('admin@sentinel.local')}
+              onClick={() => triggerDemoLogin('admin@splunksentinel.local')}
               className="py-2 border border-cyber-red/35 bg-cyber-red/5 hover:bg-cyber-red/20 text-cyber-red rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
               <ShieldCheck className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function LoginPage() {
             </button>
 
             <button
-              onClick={() => triggerDemoLogin('analyst@sentinel.local')}
+              onClick={() => triggerDemoLogin('analyst@splunksentinel.local')}
               className="py-2 border border-cyber-cyan/35 bg-cyber-cyan/5 hover:bg-cyber-cyan/20 text-cyber-cyan rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
               <UserCheck className="w-4 h-4" />
@@ -156,7 +156,7 @@ export default function LoginPage() {
             </button>
 
             <button
-              onClick={() => triggerDemoLogin('viewer@sentinel.local')}
+              onClick={() => triggerDemoLogin('viewer@splunksentinel.local')}
               className="py-2 border border-cyber-gray/35 bg-cyber-gray/5 hover:bg-cyber-gray/20 text-cyber-gray rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
               <Database className="w-4 h-4" />

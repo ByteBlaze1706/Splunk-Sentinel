@@ -1,9 +1,14 @@
 import { OpenAI } from "openai";
 import { analyzeLogsMock } from "@/utils/presets";
+import { canCreateIncident } from "@/utils/permissions";
 
 export async function POST(req) {
   try {
-    const { logs, apiKey: clientApiKey, model = "gpt-4o-mini" } = await req.json();
+    const { logs, apiKey: clientApiKey, model = "gpt-4o-mini", userRole = "Viewer" } = await req.json();
+
+    if (!canCreateIncident(userRole)) {
+      return Response.json({ error: "403 - Access Denied: Your analyst profile role is unauthorized to perform log analysis." }, { status: 403 });
+    }
 
     if (!logs || typeof logs !== "string" || logs.trim() === "") {
       return Response.json({ error: "No log data provided" }, { status: 400 });

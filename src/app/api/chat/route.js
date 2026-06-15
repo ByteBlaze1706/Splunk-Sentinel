@@ -1,9 +1,14 @@
 import { OpenAI } from "openai";
 import { getMockChatResponse } from "@/utils/presets";
+import { canUseChat } from "@/utils/permissions";
 
 export async function POST(req) {
   try {
-    const { logs, messages, apiKey: clientApiKey, model = "gpt-4o-mini" } = await req.json();
+    const { logs, messages, apiKey: clientApiKey, model = "gpt-4o-mini", userRole = "Viewer" } = await req.json();
+
+    if (!canUseChat(userRole)) {
+      return Response.json({ error: "403 - Access Denied: Your analyst profile role is unauthorized to query the Sentinel Coprocessor." }, { status: 403 });
+    }
 
     if (!logs) {
       return Response.json({ error: "No log context provided" }, { status: 400 });

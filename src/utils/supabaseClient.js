@@ -27,9 +27,9 @@ export const isMockMode = () => useMock;
 // ----------------------------------------------------
 
 const DEFAULT_USERS = [
-  { id: 'usr-1', email: 'admin@sentinel.local', full_name: 'Devayani (Admin)', role: 'Admin' },
-  { id: 'usr-2', email: 'analyst@sentinel.local', full_name: 'John Analyst', role: 'Security Analyst' },
-  { id: 'usr-3', email: 'viewer@sentinel.local', full_name: 'Sarah Viewer', role: 'Viewer' }
+  { id: 'usr-1', email: 'admin@splunksentinel.local', full_name: 'Devayani (Admin)', role: 'Admin' },
+  { id: 'usr-2', email: 'analyst@splunksentinel.local', full_name: 'John Analyst', role: 'Security Analyst' },
+  { id: 'usr-3', email: 'viewer@splunksentinel.local', full_name: 'Sarah Viewer', role: 'Viewer' }
 ];
 
 const DEFAULT_INCIDENTS = [
@@ -62,7 +62,7 @@ const DEFAULT_INCIDENTS = [
     title: 'Impossible Travel Alert',
     severity: 'MEDIUM',
     status: 'Open',
-    raw_logs: 'User admin@sentinel.local logged in from New York, then 10 mins later from Tokyo.',
+    raw_logs: 'User admin@splunksentinel.local logged in from New York, then 10 mins later from Tokyo.',
     summary: 'Co-occurring logins across disparate geographic locations within an impossible physical transit window.',
     root_cause: 'Session hijacking or compromised credentials being used by automated remote botnets.',
     remediation_plan: 'Revoke active OAuth sessions, enforce multi-factor authentication (MFA), and force credential reset.',
@@ -157,7 +157,7 @@ export const signInUser = async (email, password) => {
   const users = getLocalStorageData('sentinel_mock_users', DEFAULT_USERS);
   const foundUser = users.find(u => u.email === email);
   if (!foundUser) {
-    return { error: { message: 'Invalid credentials. Use admin@sentinel.local / analyst@sentinel.local / viewer@sentinel.local for testing.' } };
+    return { error: { message: 'Invalid credentials. Use admin@splunksentinel.local / analyst@splunksentinel.local / viewer@splunksentinel.local for testing.' } };
   }
   // Store session in localStorage
   setLocalStorageData('sentinel_session', foundUser);

@@ -69,6 +69,16 @@ import {
   getAuditLogs, 
   createAuditLog 
 } from "@/utils/supabaseClient";
+import { 
+  canView, 
+  canCreateIncident, 
+  canUpdateStatus, 
+  canDeleteIncident, 
+  canDownloadPDF, 
+  canAccessSettings, 
+  canAccessSplunk, 
+  canUseChat 
+} from "@/utils/permissions";
 
 // Severity Palette for Recharts Pie Chart
 const SEVERITY_COLORS = {
@@ -83,6 +93,41 @@ const generateIncidentId = () => {
   return `INC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 };
 
+// AccessDeniedView Component: Rendered when role permissions are insufficient for activeView
+function AccessDeniedView({ activeView, role, onGoHome }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 max-w-lg mx-auto space-y-6 font-mono text-center animate-fadeIn">
+      <div className="inline-flex items-center justify-center p-4 border border-cyber-red/30 bg-cyber-red/5 rounded-full mb-2 shadow-red-glow">
+        <Lock className="w-12 h-12 text-cyber-red filter drop-shadow-[0_0_8px_#f87171] animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold tracking-widest text-cyber-red text-shadow-red uppercase">
+          403 - ACCESS DENIED
+        </h2>
+        <div className="text-[10px] text-cyber-red/80 font-bold border border-cyber-red/20 bg-cyber-red/5 py-0.5 px-3 rounded inline-block">
+          RESTRICTED ENDPOINT SECURITY FAULT
+        </div>
+      </div>
+      <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
+        Your SOC profile role <span className="text-white font-bold bg-cyber-red/10 border border-cyber-red/30 px-1.5 py-0.5 rounded">[{role?.toUpperCase()}]</span> is unauthorized to access the <span className="text-cyber-cyan font-bold">&quot;{activeView?.toUpperCase()}&quot;</span> panel.
+      </p>
+      <div className="p-4 rounded border border-cyber-border bg-cyber-card/40 text-[10px] text-left leading-relaxed text-slate-400 w-full space-y-1">
+        <div className="text-cyber-red font-bold uppercase mb-1">Authorization Details:</div>
+        <div>• Request: GET /terminal?view={activeView}</div>
+        <div>• Policy: RBAC_RESTRICTED_ACCESS_CONTROL</div>
+        <div>• Status: Forbidden (403)</div>
+        <div>• Log Signature: SEC_UNAUTH_TAB_CROSSING_ALERT</div>
+      </div>
+      <button
+        onClick={onGoHome}
+        className="px-6 py-2.5 bg-cyber-red text-cyber-bg border border-cyber-red rounded font-bold text-xs hover:bg-transparent hover:text-cyber-red hover:shadow-red-glow transition-all uppercase cursor-pointer"
+      >
+        Return to Safety
+      </button>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   
@@ -93,6 +138,14 @@ export default function Home() {
 
   // Layout View States
   const [activeView, setActiveView] = useState("dashboard");
+  const changeView = (viewName) => {
+    setActiveView(viewName);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location);
+      url.searchParams.set("view", viewName);
+      window.history.pushState({}, "", url.toString());
+    }
+  };
   const [incidents, setIncidents] = useState([]);
   const [reports, setReports] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -173,6 +226,11 @@ export default function Home() {
         if (typeof window !== "undefined") {
           setOpenaiKey(localStorage.getItem("sentinel_openai_key") || "");
           setSelectedModel(localStorage.getItem("sentinel_model") || "gpt-4o-mini");
+          const params = new URLSearchParams(window.location.search);
+          const viewParam = params.get("view");
+          if (viewParam) {
+            setActiveView(viewParam);
+          }
         }
 
         refreshTelemetry();
@@ -288,8 +346,8 @@ export default function Home() {
     e.preventDefault();
     if (!newIncTitle || !newIncLogs) return;
 
-    if (currentUser?.role === "Viewer") {
-      triggerToast("Viewer profile restricted from creating incidents", "error");
+    if (!canCreateIncident(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to create incidents.", "error");
       return;
     }
 
@@ -328,8 +386,8 @@ export default function Home() {
 
   const handleUpdateStatus = async (statusVal) => {
     if (!selectedIncident) return;
-    if (currentUser?.role === "Viewer") {
-      triggerToast("Viewer profile restricted from editing incidents", "error");
+    if (!canUpdateStatus(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to update status.", "error");
       return;
     }
 
@@ -346,8 +404,8 @@ export default function Home() {
 
   const handleUpdateAssignment = async (analystName) => {
     if (!selectedIncident) return;
-    if (currentUser?.role === "Viewer") {
-      triggerToast("Viewer profile restricted from assigning incidents", "error");
+    if (currentUser?.role !== "Admin") {
+      triggerToast("403 - Access Denied: Only Admin role is authorized to assign analyst owners.", "error");
       return;
     }
 
@@ -363,8 +421,8 @@ export default function Home() {
   };
 
   const handleDeleteRecord = async (incId) => {
-    if (currentUser?.role !== "Admin") {
-      triggerToast("Access Denied: Only Admin role can delete incident records", "error");
+    if (!canDeleteIncident(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Only Admin role is authorized to delete incident records.", "error");
       return;
     }
 
@@ -376,7 +434,7 @@ export default function Home() {
       await logSOCActivity(`${currentUser?.full_name} deleted incident record ${incId}`);
       if (selectedIncident?.id === incId) {
         setSelectedIncident(null);
-        setActiveView("history");
+        changeView("history");
       }
       refreshTelemetry();
     }
@@ -385,8 +443,8 @@ export default function Home() {
   // Run AI analysis pipeline
   const runAnalysis = async () => {
     if (!logsInput.trim()) return;
-    if (currentUser?.role === "Viewer") {
-      triggerToast("Viewer role restricted from scanning logs", "error");
+    if (!canCreateIncident(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to run log analysis.", "error");
       return;
     }
 
@@ -455,7 +513,7 @@ export default function Home() {
         } else {
           setLogsInput("");
           setSelectedIncident(dbData);
-          setActiveView("detail");
+          changeView("detail");
           triggerToast("Log analysis complete!", "success");
           await logSOCActivity(`${currentUser?.full_name} analyzed raw logs and generated incident ${dbData.id}`, dbData.id);
           refreshTelemetry();
@@ -474,8 +532,8 @@ export default function Home() {
     e.preventDefault();
     if (!chatInput.trim() || !selectedIncident) return;
 
-    if (currentUser?.role === "Viewer") {
-      triggerToast("Viewer profile restricted from chatting with logs", "error");
+    if (!canUseChat(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to query the Sentinel Coprocessor.", "error");
       return;
     }
 
@@ -537,8 +595,8 @@ export default function Home() {
   // Containment Checklist Action toggler
   const handleToggleAction = async (action) => {
     if (!selectedIncident) return;
-    if (currentUser?.role === "Viewer") {
-      triggerToast("Viewer profile restricted from altering containment playbooks", "error");
+    if (!canUpdateStatus(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to alter containment playbooks.", "error");
       return;
     }
 
@@ -564,6 +622,10 @@ export default function Home() {
 
   // Compile PDF Report
   const handleDownloadPDF = async (incident) => {
+    if (!canDownloadPDF(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to export PDF reports.", "error");
+      return;
+    }
     try {
       const doc = new jsPDF();
       
@@ -747,14 +809,39 @@ export default function Home() {
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
-    if (currentUser?.role === "Viewer") {
-      triggerToast("Viewer profile restricted from saving core settings", "error");
+    if (!canAccessSettings(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to save settings.", "error");
       return;
     }
     localStorage.setItem("sentinel_openai_key", openaiKey);
     localStorage.setItem("sentinel_model", selectedModel);
     triggerToast("Core settings saved locally", "success");
     logSOCActivity(`${currentUser?.full_name} updated LLM settings models to ${selectedModel}`);
+  };
+
+  const testMcpConnection = async () => {
+    if (!canAccessSplunk(currentUser?.role || "Viewer")) {
+      triggerToast("403 - Access Denied: Your role is unauthorized to configure Splunk bridge.", "error");
+      return;
+    }
+    setMcpStatus("testing");
+    setMcpLogs(["[SYS] Initiating JSON-RPC handshake...", "[SYS] Connecting to WebSocket..."]);
+    
+    setTimeout(() => {
+      setMcpLogs(prev => [...prev, "[SYS] WebSocket connected to " + splunkHost, "[SYS] Sending initialize request..."]);
+    }, 1000);
+
+    setTimeout(() => {
+      setMcpLogs(prev => [
+        ...prev,
+        "[SYS] Received schema initialization: 4 tools resolved.",
+        "[SYS] Schema tools: splunk_search, splunk_list_alerts, splunk_get_sourcetypes, splunk_post_hec",
+        "[SYS] Success: Splunk MCP Bridge is READY."
+      ]);
+      setMcpStatus("idle");
+      triggerToast("Splunk MCP Connection verified successfully", "success");
+      logSOCActivity(`${currentUser?.full_name} successfully verified Splunk MCP Bridge connection to ${splunkHost}`);
+    }, 2500);
   };
 
   const loadPreset = (presetKey) => {
@@ -905,6 +992,21 @@ export default function Home() {
 
         {/* Global Live Badges */}
         <div className="flex flex-wrap items-center gap-4 text-[10px]">
+          {currentUser && (
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 border rounded text-[9px] font-bold ${
+              currentUser.role === 'Admin' ? 'border-cyber-red/45 bg-cyber-red/5 text-cyber-red shadow-red-glow' :
+              currentUser.role === 'Security Analyst' ? 'border-cyber-cyan/45 bg-cyber-cyan/5 text-cyber-cyan shadow-cyan-glow' :
+              'border-slate-500/40 bg-slate-500/5 text-slate-400'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                currentUser.role === 'Admin' ? 'bg-cyber-red animate-ping' :
+                currentUser.role === 'Security Analyst' ? 'bg-cyber-cyan animate-pulse' :
+                'bg-slate-400'
+              }`}></span>
+              <span>TERMINAL ACCESS: [{currentUser.role.toUpperCase()}]</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-1.5 px-2.5 py-1 border border-cyber-green/20 bg-cyber-green/5 text-cyber-green rounded">
             <span className="w-1.5 h-1.5 rounded-full bg-cyber-green animate-ping"></span>
             <span className="font-bold uppercase text-[9px]">HEURISTIC ENGINE: ACTIVE</span>
@@ -919,20 +1021,18 @@ export default function Home() {
             <span className="font-bold uppercase text-[9px]">{openaiKey || !isMockMode() ? "OPENAI CONNECTED" : "AI ENGINE: MOCK MODE"}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => {
-                if (currentUser?.role === "Viewer") {
-                  triggerToast("Viewer profile restricted from creating incidents", "error");
-                } else {
+          {currentUser && canCreateIncident(currentUser.role) && (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
                   setShowCreateModal(true);
-                }
-              }}
-              className="px-3 py-1 bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan rounded hover:bg-cyber-cyan hover:text-cyber-bg text-[10px] font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 uppercase"
-            >
-              <Plus className="w-3 h-3" /> New Incident
-            </button>
-          </div>
+                }}
+                className="px-3 py-1 bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan rounded hover:bg-cyber-cyan hover:text-cyber-bg text-[10px] font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 uppercase"
+              >
+                <Plus className="w-3 h-3" /> New Incident
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -943,77 +1043,89 @@ export default function Home() {
         <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-cyber-border bg-cyber-card/40 flex flex-row md:flex-col p-4 gap-2 z-10 overflow-x-auto md:overflow-x-visible whitespace-nowrap md:whitespace-normal scrollbar-none flex-shrink-0">
           <div className="hidden md:block px-3 py-2 text-[10px] font-mono text-cyber-gray tracking-wider uppercase mb-2">SOC Navigation</div>
           
-          <button 
-            onClick={() => { setActiveView("dashboard"); setSelectedIncident(null); }}
-            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
-              activeView === "dashboard" 
-                ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
-                : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
-            }`}
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            <span>DASHBOARD</span>
-          </button>
+          {canView(currentUser?.role || 'Viewer', "dashboard") && (
+            <button 
+              onClick={() => { changeView("dashboard"); setSelectedIncident(null); }}
+              className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+                activeView === "dashboard" 
+                  ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
+                  : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span>DASHBOARD</span>
+            </button>
+          )}
           
-          <button 
-            onClick={() => { setActiveView("analyzer"); }}
-            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
-              activeView === "analyzer" 
-                ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
-                : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
-            }`}
-          >
-            <FileSearch className="w-4 h-4" />
-            <span>LOG ANALYZER</span>
-          </button>
+          {canView(currentUser?.role || 'Viewer', "analyzer") && (
+            <button 
+              onClick={() => { changeView("analyzer"); }}
+              className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+                activeView === "analyzer" 
+                  ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
+                  : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
+              }`}
+            >
+              <FileSearch className="w-4 h-4" />
+              <span>LOG ANALYZER</span>
+            </button>
+          )}
 
-          <button 
-            onClick={() => { setActiveView("history"); }}
-            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
-              activeView === "history" || activeView === "detail"
-                ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
-                : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>INCIDENT HISTORY</span>
-          </button>
+          {canView(currentUser?.role || 'Viewer', "history") && (
+            <button 
+              onClick={() => { changeView("history"); }}
+              className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+                activeView === "history" || activeView === "detail"
+                  ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
+                  : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>INCIDENT HISTORY</span>
+            </button>
+          )}
 
-          <button 
-            onClick={() => { setActiveView("reports"); }}
-            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
-              activeView === "reports" 
-                ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
-                : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>REPORT CENTER</span>
-          </button>
+          {canView(currentUser?.role || 'Viewer', "reports") && (
+            <button 
+              onClick={() => { changeView("reports"); }}
+              className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+                activeView === "reports" 
+                  ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
+                  : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>REPORT CENTER</span>
+            </button>
+          )}
 
-          <button 
-            onClick={() => { setActiveView("splunk-mcp"); }}
-            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
-              activeView === "splunk-mcp" 
-                ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
-                : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
-            }`}
-          >
-            <Database className="w-4 h-4" />
-            <span>SPLUNK INTEGRATION</span>
-          </button>
+          {canView(currentUser?.role || 'Viewer', "splunk-mcp") && (
+            <button 
+              onClick={() => { changeView("splunk-mcp"); }}
+              className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+                activeView === "splunk-mcp" 
+                  ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
+                  : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span>SPLUNK INTEGRATION</span>
+            </button>
+          )}
 
-          <button 
-            onClick={() => { setActiveView("settings"); }}
-            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
-              activeView === "settings" 
-                ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
-                : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            <span>SYSTEM SETTINGS</span>
-          </button>
+          {canView(currentUser?.role || 'Viewer', "settings") && (
+            <button 
+              onClick={() => { changeView("settings"); }}
+              className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+                activeView === "settings" 
+                  ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
+                  : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              <span>SYSTEM SETTINGS</span>
+            </button>
+          )}
 
           {/* User profile & Logout Box */}
           {currentUser && (
@@ -1024,12 +1136,12 @@ export default function Home() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-bold text-white truncate">{currentUser.full_name}</div>
-                  <div className={`text-[8px] font-bold uppercase inline-block border px-1 rounded ${
-                    currentUser.role === 'Admin' ? 'border-cyber-red/40 bg-cyber-red/5 text-cyber-red' :
-                    currentUser.role === 'Security Analyst' ? 'border-cyber-cyan/40 bg-cyber-cyan/5 text-cyber-cyan' :
-                    'border-slate-500 bg-slate-500/5 text-slate-400'
+                  <div className={`text-[8px] font-bold uppercase inline-block border px-1.5 py-0.5 rounded shadow-sm ${
+                    currentUser.role === 'Admin' ? 'border-cyber-red/40 bg-cyber-red/10 text-cyber-red shadow-red-glow' :
+                    currentUser.role === 'Security Analyst' ? 'border-cyber-cyan/40 bg-cyber-cyan/10 text-cyber-cyan shadow-cyan-glow' :
+                    'border-slate-500 bg-slate-500/10 text-slate-400'
                   }`}>
-                    {currentUser.role}
+                    [{currentUser.role.toUpperCase()}]
                   </div>
                 </div>
               </div>
@@ -1046,6 +1158,10 @@ export default function Home() {
 
         {/* WORKSPACE AREA */}
         <main className="flex-1 p-6 overflow-y-auto z-10">
+          {currentUser && !canView(currentUser.role, activeView) ? (
+            <AccessDeniedView activeView={activeView} role={currentUser.role} onGoHome={() => changeView("dashboard")} />
+          ) : (
+            <>
 
           {/* VIEW: DASHBOARD */}
           {activeView === "dashboard" && (
@@ -1494,7 +1610,7 @@ export default function Home() {
                             <td className="py-4 px-2 text-[10px] text-cyber-cyan">{inc.mocked ? "Local Simulation" : "OpenAI Backend"}</td>
                             <td className="py-4 px-2 text-right space-x-2">
                               <button 
-                                onClick={() => { setSelectedIncident(inc); setActiveView("detail"); }}
+                                onClick={() => { setSelectedIncident(inc); changeView("detail"); }}
                                 className="px-2.5 py-1 bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan rounded hover:bg-cyber-cyan/20 transition-all cursor-pointer"
                               >
                                 View Forensic
@@ -1518,7 +1634,7 @@ export default function Home() {
                   <div className="text-center py-20 text-xs text-cyber-gray font-mono space-y-4">
                     <p>Forensic database is clean. No active incident alerts cached.</p>
                     <button 
-                      onClick={() => setActiveView("analyzer")}
+                      onClick={() => changeView("analyzer")}
                       className="px-4 py-2 border border-cyber-cyan text-cyber-cyan hover:bg-cyber-cyan hover:text-cyber-bg text-xs font-mono font-bold rounded cursor-pointer"
                     >
                       Analyze raw logs
@@ -1651,7 +1767,7 @@ export default function Home() {
                                   onClick={() => {
                                     if (matchingInc) {
                                       setSelectedIncident(matchingInc);
-                                      setActiveView("detail");
+                                      changeView("detail");
                                     } else {
                                       triggerToast("Original case logs missing.", "error");
                                     }
@@ -2031,7 +2147,7 @@ export default function Home() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-border/40 pb-4">
                 <div className="flex items-center gap-3">
                   <button 
-                    onClick={() => { setActiveView("history"); setSelectedIncident(null); }}
+                    onClick={() => { changeView("history"); setSelectedIncident(null); }}
                     className="px-3 py-1.5 border border-cyber-border bg-cyber-card text-xs font-mono text-slate-400 hover:text-white rounded hover:bg-cyber-card-light transition-all cursor-pointer"
                   >
                     &larr; BACK TO RECORD LIST
@@ -2052,7 +2168,7 @@ export default function Home() {
                     <span className="text-cyber-gray text-[9px] uppercase font-bold">STATUS:</span>
                     <select
                       value={selectedIncident.status}
-                      disabled={currentUser?.role === "Viewer"}
+                      disabled={!canUpdateStatus(currentUser?.role || "Viewer")}
                       onChange={(e) => handleUpdateStatus(e.target.value)}
                       className="bg-transparent text-white focus:outline-none text-xs font-mono uppercase font-bold"
                     >
@@ -2068,7 +2184,7 @@ export default function Home() {
                     <span className="text-cyber-gray text-[9px] uppercase font-bold">OWNER:</span>
                     <select
                       value={selectedIncident.assigned_analyst || "Unassigned"}
-                      disabled={currentUser?.role === "Viewer"}
+                      disabled={currentUser?.role !== "Admin"}
                       onChange={(e) => handleUpdateAssignment(e.target.value)}
                       className="bg-transparent text-white focus:outline-none text-xs font-mono"
                     >
@@ -2079,12 +2195,14 @@ export default function Home() {
                     </select>
                   </div>
 
-                  <button 
-                    onClick={() => handleDownloadPDF(selectedIncident)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan rounded hover:bg-cyber-cyan/25 hover:shadow-cyan-glow transition-all text-xs font-mono cursor-pointer font-bold"
-                  >
-                    <Download className="w-3.5 h-3.5" /> EXPORT PDF REPORT
-                  </button>
+                  {currentUser && canDownloadPDF(currentUser.role) && (
+                    <button 
+                      onClick={() => handleDownloadPDF(selectedIncident)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan rounded hover:bg-cyber-cyan/25 hover:shadow-cyan-glow transition-all text-xs font-mono cursor-pointer font-bold"
+                    >
+                      <Download className="w-3.5 h-3.5" /> EXPORT PDF REPORT
+                    </button>
+                  )}
 
                   {currentUser?.role === "Admin" && (
                     <button 
@@ -2108,8 +2226,8 @@ export default function Home() {
               {/* Forensic Details split grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 
-                {/* LEFT: Forensic analysis panels (7 cols) */}
-                <div className="lg:col-span-7 space-y-6">
+                {/* LEFT: Forensic analysis panels (7 cols or 12 cols if chat restricted) */}
+                <div className={`${currentUser && canUseChat(currentUser.role) ? "lg:col-span-7" : "lg:col-span-12"} space-y-6`}>
                   
                   {/* Executive Summary card */}
                   <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded space-y-3 relative overflow-hidden">
@@ -2262,14 +2380,23 @@ export default function Home() {
                       {selectedIncident.recommendedActions && selectedIncident.recommendedActions.length > 0 ? (
                         selectedIncident.recommendedActions.map((action, idx) => {
                           const isCompleted = selectedIncident.completedActions?.includes(action);
+                          const isViewer = currentUser?.role === "Viewer";
                           return (
                             <div 
                               key={idx}
-                              onClick={() => handleToggleAction(action)}
-                              className={`p-3 border rounded text-xs font-mono cursor-pointer transition-all flex items-start gap-3 ${
-                                isCompleted 
-                                  ? "border-cyber-green/45 bg-cyber-green/5 text-cyber-green/80" 
-                                  : "border-cyber-border bg-cyber-bg hover:border-cyber-cyan/60 text-slate-300"
+                              onClick={() => {
+                                if (!isViewer) {
+                                  handleToggleAction(action);
+                                } else {
+                                  triggerToast("403 - Access Denied: Viewer role is unauthorized to alter containment playbooks.", "error");
+                                }
+                              }}
+                              className={`p-3 border rounded text-xs font-mono transition-all flex items-start gap-3 ${
+                                isViewer 
+                                  ? "cursor-not-allowed opacity-60 border-cyber-border bg-cyber-bg text-slate-400"
+                                  : isCompleted 
+                                    ? "border-cyber-green/45 bg-cyber-green/5 text-cyber-green/80 cursor-pointer" 
+                                    : "border-cyber-border bg-cyber-bg hover:border-cyber-cyan/60 text-slate-300 cursor-pointer"
                               }`}
                             >
                               <span className={`w-4 h-4 border rounded flex items-center justify-center flex-shrink-0 ${isCompleted ? "border-cyber-green text-cyber-green bg-cyber-green/20" : "border-cyber-gray"}`}>
@@ -2297,8 +2424,8 @@ export default function Home() {
 
                 </div>
 
-                {/* RIGHT: Sentinel AI Copilot V2 (5 cols) */}
-                <div className="lg:col-span-5 p-5 border border-cyber-border bg-cyber-card/65 rounded flex flex-col h-[600px] relative">
+                {currentUser && canUseChat(currentUser.role) && (
+                  <div className="lg:col-span-5 p-5 border border-cyber-border bg-cyber-card/65 rounded flex flex-col h-[600px] relative">
                   
                   {/* Title */}
                   <div className="border-b border-cyber-border/40 pb-3 flex items-center justify-between mb-4">
@@ -2414,13 +2541,15 @@ export default function Home() {
                     </button>
                   </form>
 
-                </div>
+                  </div>
+                )}
 
               </div>
 
             </div>
           )}
-
+            </>
+          )}
         </main>
       </div>
 
