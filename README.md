@@ -236,29 +236,6 @@ Chronological trails of user changes and actions in the SOC.
 | Modify System Settings | ✓ | Locked | Locked |
 | Delete Incident Records | ✓ | Locked | Locked |
 
-### 📸 RBAC Verification Screenshots
-
-1. **Admin Full Access**:
-   ![Admin Full Access](public/screenshots/rbac_admin_full.png)
-   *Caption: Admin view displaying full sidebar navigation tabs and operational controls.*
-
-2. **Analyst Restricted Access**:
-   ![Analyst Restricted Access](public/screenshots/rbac_analyst.png)
-   *Caption: Analyst view restricting system settings and Splunk bridge configurations.*
-
-3. **Viewer Restricted Access**:
-   ![Viewer Restricted Access](public/screenshots/rbac_viewer.png)
-   *Caption: Viewer view showing restricted sidebar navigation and locked incident logs/chat functions.*
-
-4. **Viewer Access Denied Page**:
-   ![Viewer Access Denied Page](public/screenshots/rbac_access_denied.png)
-   *Caption: Premium Access Denied terminal displayed when accessing unauthorized panels directly.*
-
-5. **Hidden Navigation Comparison**:
-   ![Hidden Navigation Comparison](public/screenshots/rbac_sidebar_comparison.png)
-   *Caption: Comparison showing how navigation controls auto-adapt based on authorization level.*
-
----
 
 ## 🔁 Data Flow Architecture
 
