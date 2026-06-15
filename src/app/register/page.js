@@ -122,7 +122,6 @@ export default function RegisterPage() {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-xs text-cyber-cyan focus:outline-none focus:border-cyber-cyan"
               >
-                <option value="Admin">Admin</option>
                 <option value="Security Analyst">Security Analyst</option>
                 <option value="Viewer">Viewer</option>
               </select>

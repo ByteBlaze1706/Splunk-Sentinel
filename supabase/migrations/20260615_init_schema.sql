@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Enable RLS for Users
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read access to profiles" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Allow public insert to profiles except admin" ON public.users FOR INSERT WITH CHECK (role != 'Admin');
 CREATE POLICY "Allow users to update own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
 
 -- 2. Incidents Table (Compromise Cases)

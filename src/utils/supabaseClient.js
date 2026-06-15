@@ -116,6 +116,10 @@ const setLocalStorageData = (key, data) => {
 // ----------------------------------------------------
 
 export const signUpUser = async (email, password, fullName, role) => {
+  if (role && role.toLowerCase() === 'admin') {
+    return { error: { message: '403 - Admin account creation is restricted.' } };
+  }
+
   if (!useMock) {
     const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
     if (authError) return { error: authError };
