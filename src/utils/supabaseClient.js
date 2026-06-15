@@ -26,10 +26,14 @@ export const isMockMode = () => useMock;
 // LOCAL STORAGE MOCK DATABASE SEED & helpers
 // ----------------------------------------------------
 
+const DEMO_ADMIN_EMAIL = process.env.NEXT_PUBLIC_DEMO_ADMIN_EMAIL || 'admin@splunksentinel.local';
+const DEMO_ANALYST_EMAIL = process.env.NEXT_PUBLIC_DEMO_ANALYST_EMAIL || 'analyst@splunksentinel.local';
+const DEMO_VIEWER_EMAIL = process.env.NEXT_PUBLIC_DEMO_VIEWER_EMAIL || 'viewer@splunksentinel.local';
+
 const DEFAULT_USERS = [
-  { id: 'usr-1', email: 'admin@splunksentinel.local', full_name: 'Devayani (Admin)', role: 'Admin' },
-  { id: 'usr-2', email: 'analyst@splunksentinel.local', full_name: 'John Analyst', role: 'Security Analyst' },
-  { id: 'usr-3', email: 'viewer@splunksentinel.local', full_name: 'Sarah Viewer', role: 'Viewer' }
+  { id: 'usr-1', email: DEMO_ADMIN_EMAIL, full_name: 'Devayani (Admin)', role: 'Admin' },
+  { id: 'usr-2', email: DEMO_ANALYST_EMAIL, full_name: 'John Analyst', role: 'Security Analyst' },
+  { id: 'usr-3', email: DEMO_VIEWER_EMAIL, full_name: 'Sarah Viewer', role: 'Viewer' }
 ];
 
 const DEFAULT_INCIDENTS = [
@@ -62,7 +66,7 @@ const DEFAULT_INCIDENTS = [
     title: 'Impossible Travel Alert',
     severity: 'MEDIUM',
     status: 'Open',
-    raw_logs: 'User admin@splunksentinel.local logged in from New York, then 10 mins later from Tokyo.',
+    raw_logs: `User ${DEMO_ADMIN_EMAIL} logged in from New York, then 10 mins later from Tokyo.`,
     summary: 'Co-occurring logins across disparate geographic locations within an impossible physical transit window.',
     root_cause: 'Session hijacking or compromised credentials being used by automated remote botnets.',
     remediation_plan: 'Revoke active OAuth sessions, enforce multi-factor authentication (MFA), and force credential reset.',
@@ -137,14 +141,14 @@ export const signUpUser = async (email, password, fullName, role) => {
 export const signInUser = async (email, password) => {
   if (!useMock) {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) return { error: authError };
+    if (authError) return { error: { message: 'Invalid email or password.' } };
     // Fetch profile
     const { data: profileData, error: profileError } = await supabase
       .from('users')
       .select('*')
       .eq('id', authData.user.id)
       .single();
-    if (profileError) return { error: profileError };
+    if (profileError) return { error: { message: 'Invalid email or password.' } };
     
     // Store in session
     if (typeof window !== 'undefined') {
@@ -157,11 +161,22 @@ export const signInUser = async (email, password) => {
   const users = getLocalStorageData('sentinel_mock_users', DEFAULT_USERS);
   const foundUser = users.find(u => u.email === email);
   if (!foundUser) {
-    return { error: { message: 'Invalid credentials. Use admin@splunksentinel.local / analyst@splunksentinel.local / viewer@splunksentinel.local for testing.' } };
+    return { error: { message: 'Invalid email or password.' } };
   }
   // Store session in localStorage
   setLocalStorageData('sentinel_session', foundUser);
   return { data: foundUser };
+};
+
+export const signInDemoUser = async (role) => {
+  const emailMap = {
+    admin: DEMO_ADMIN_EMAIL,
+    analyst: DEMO_ANALYST_EMAIL,
+    viewer: DEMO_VIEWER_EMAIL
+  };
+  const email = emailMap[role.toLowerCase()];
+  if (!email) return { error: { message: 'Invalid email or password.' } };
+  return signInUser(email, 'password123');
 };
 
 export const signOutUser = async () => {

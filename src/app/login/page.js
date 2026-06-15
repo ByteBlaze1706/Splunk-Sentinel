@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Database, ShieldAlert, KeyRound, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
-import { signInUser, getSessionUser } from '../../utils/supabaseClient';
+import { signInUser, signInDemoUser, getSessionUser } from '../../utils/supabaseClient';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,10 +42,10 @@ export default function LoginPage() {
     }
   };
 
-  const triggerDemoLogin = async (demoEmail) => {
+  const triggerDemoLogin = async (role) => {
     setLoading(true);
     setError('');
-    const { data, error: err } = await signInUser(demoEmail, 'password123');
+    const { data, error: err } = await signInDemoUser(role);
     setLoading(false);
 
     if (err) {
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="analyst@splunksentinel.local"
+                placeholder="analyst@corp.local"
                 className="w-full p-2.5 pl-3 bg-cyber-bg border border-cyber-border rounded text-xs text-cyber-cyan focus:outline-none focus:border-cyber-cyan focus:shadow-cyan-glow"
               />
             </div>
@@ -140,7 +140,7 @@ export default function LoginPage() {
           </p>
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => triggerDemoLogin('admin@splunksentinel.local')}
+              onClick={() => triggerDemoLogin('admin')}
               className="py-2 border border-cyber-red/35 bg-cyber-red/5 hover:bg-cyber-red/20 text-cyber-red rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
               <ShieldCheck className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function LoginPage() {
             </button>
 
             <button
-              onClick={() => triggerDemoLogin('analyst@splunksentinel.local')}
+              onClick={() => triggerDemoLogin('analyst')}
               className="py-2 border border-cyber-cyan/35 bg-cyber-cyan/5 hover:bg-cyber-cyan/20 text-cyber-cyan rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
               <UserCheck className="w-4 h-4" />
@@ -156,7 +156,7 @@ export default function LoginPage() {
             </button>
 
             <button
-              onClick={() => triggerDemoLogin('viewer@splunksentinel.local')}
+              onClick={() => triggerDemoLogin('viewer')}
               className="py-2 border border-cyber-gray/35 bg-cyber-gray/5 hover:bg-cyber-gray/20 text-cyber-gray rounded text-[10px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
               <Database className="w-4 h-4" />
