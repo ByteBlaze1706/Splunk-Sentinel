@@ -1,6 +1,8 @@
+// src/app/page.js
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   ShieldAlert, 
@@ -26,158 +28,83 @@ import {
   Lock,
   ArrowRight,
   Database,
-  RefreshCw
+  RefreshCw,
+  UserCheck,
+  LogOut,
+  Search,
+  SlidersHorizontal,
+  BookOpen,
+  Clock
 } from "lucide-react";
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  BarChart, 
+  Bar 
+} from "recharts";
 import { PRESETS } from "@/utils/presets";
 import { jsPDF } from "jspdf";
+import { 
+  supabase, 
+  isMockMode, 
+  getSessionUser, 
+  signOutUser, 
+  getIncidents, 
+  createIncident, 
+  updateIncident, 
+  deleteIncident, 
+  getReports, 
+  createReport, 
+  getChats, 
+  saveChat, 
+  getAuditLogs, 
+  createAuditLog 
+} from "@/utils/supabaseClient";
 
-// Default pre-populated incidents to show on first load
-const INITIAL_INCIDENTS = [
-  {
-    id: "INC-2026-1001",
-    timestamp: "2026-06-15 14:22:32",
-    title: "SSH Brute Force Attack",
-    severity: "critical",
-    status: "Resolved",
-    threatType: "Credential Bruteforcing & Account Compromise",
-    rootCause: "An external attacker at IP 198.51.100.42 targeted the server 'auth-srv-01' using a dictionary password attack against common users (admin, root, operator) before successfully guessing the password for user 'devops'. Immediately after authentication, the attacker spawned an interactive root bash shell (/bin/bash) via sudo, achieving full host compromise.",
-    summary: "External entity conducted a successful SSH brute-force attack against host auth-srv-01, compromising the devops account and escalating privileges to root within 2.5 minutes.",
-    keyArtifacts: {
-      sourceIps: ["198.51.100.42"],
-      targetSystems: ["auth-srv-01"],
-      affectedUsers: ["devops", "root", "admin", "operator"],
-      signatures: ["sshd: Failed password", "sshd: Accepted password", "sudo: COMMAND=/bin/bash"]
-    },
-    recommendedActions: [
-      "Immediately revoke session for user 'devops' and terminate PID 12518.",
-      "Disable password authentication in /etc/ssh/sshd_config (enforce SSH Keys only).",
-      "Temporarily block source IP address 198.51.100.42 on the perimeter firewall.",
-      "Force password rotation and audit SSH authorized_keys for the 'devops' account.",
-      "Configure fail2ban or equivalent IPS to automatically block hosts with >5 failed logins."
-    ],
-    completedActions: [
-      "Immediately revoke session for user 'devops' and terminate PID 12518.",
-      "Disable password authentication in /etc/ssh/sshd_config (enforce SSH Keys only).",
-      "Temporarily block source IP address 198.51.100.42 on the perimeter firewall.",
-      "Force password rotation and audit SSH authorized_keys for the 'devops' account.",
-      "Configure fail2ban or equivalent IPS to automatically block hosts with >5 failed logins."
-    ],
-    timeline: [
-      { time: "14:20:01", event: "Attack Start", details: "Initial failed login attempt targeting user 'admin' from IP 198.51.100.42." },
-      { time: "14:20:30", event: "Target Shift", details: "Attacker shifts targets to administrative accounts 'root' and 'operator'." },
-      { time: "14:21:02", event: "Targeting DevOps", details: "Attacker begins targeting user 'devops', generating 3 failed passwords." },
-      { time: "14:21:58", event: "Compromise", details: "Attacker guesses correct password for 'devops' and establishes active session." },
-      { time: "14:22:30", event: "Privilege Escalation", details: "User 'devops' executes sudo to run /bin/bash, gaining full root privileges." }
-    ],
-    logs: PRESETS.bruteForce.logs,
-    chatHistory: [
-      { role: "assistant", content: "Hello, I am Sentinel. I have compiled the analysis for this SSH Brute Force attack. The attacker achieved root privilege via passwordless sudo find execution. How would you like to proceed with containment?", timestamp: "14:23:10" }
-    ],
-    mocked: true,
-    modelUsed: "MOCK ENGINE"
-  },
-  {
-    id: "INC-2026-1002",
-    timestamp: "2026-06-15 15:11:30",
-    title: "Web Application SQL Injection",
-    severity: "high",
-    status: "Investigating",
-    threatType: "SQL Injection (SQLi) & Data Reconnaissance",
-    rootCause: "The web application endpoint `/api/v1/products` failed to sanitize input parameter `category`. An attacker at IP 203.0.113.88 exploited this vulnerability by inserting SQL payloads (`UNION SELECT` and `pg_sleep`) to query the underlying PostgreSQL database. The attacker mapped out database column structures, found the user table `accounts`, extracted credentials (`user_name` and `password_hash`), and then leveraged an admin export route to download the database tables.",
-    summary: "SQL Injection vulnerability on web application was successfully exploited by 203.0.113.88, leading to database schema mapping, table enumeration, and database backup exfiltration.",
-    keyArtifacts: {
-      sourceIps: ["203.0.113.88"],
-      targetSystems: ["Web Gateway", "DB-SERVER-01 (PostgreSQL)"],
-      affectedUsers: ["PostgreSQL App Connection", "Admin portal account"],
-      signatures: ["UNION SELECT", "pg_sleep(10)", "OR 1=1", "postgresql ERROR:relation does not exist"]
-    },
-    recommendedActions: [
-      "Implement parameterized queries or use an ORM for query construction in `/api/v1/products`.",
-      "Deploy Web Application Firewall (WAF) rules targeting SQL injection patterns (e.g. UNION/SELECT regex).",
-      "Enable database query parameter validation and restrict application DB user privileges (least privilege).",
-      "Block IP 203.0.113.88 immediately at the application gateway / load balancer.",
-      "Audit the `/api/v1/admin/exports` endpoint access control - verify why the unauthorized user could invoke it."
-    ],
-    completedActions: [
-      "Block IP 203.0.113.88 immediately at the application gateway / load balancer."
-    ],
-    timeline: [
-      { time: "15:10:02", event: "Reconnaissance", details: "Attacker issues standard HTTP request to inspect system behavior." },
-      { time: "15:10:15", event: "SQLi Probe", details: "Attacker attempts simple tautology probe `' OR 1=1--` to bypass category filtering." },
-      { time: "15:10:30", event: "Error Injection", details: "Attacker injects UNION SELECT to query user table, triggering database schema mismatch error." },
-      { time: "15:10:45", event: "Data Leak", details: "Attacker successfully guesses correct table name `accounts` and retrieves credentials." },
-      { time: "15:11:30", event: "Exfiltration", details: "Attacker calls backend admin export file, pulling down the full accounts table (89KB JSON)." }
-    ],
-    logs: PRESETS.sqlInjection.logs,
-    chatHistory: [
-      { role: "assistant", content: "Warning: Database exposure confirmed. The logs capture table dumps being requested from 203.0.113.88. Parameterized queries must be implemented. I can write a remediation query or configuration script for you. What language is the backend written in?", timestamp: "15:12:05" }
-    ],
-    mocked: true,
-    modelUsed: "MOCK ENGINE"
-  },
-  {
-    id: "INC-2026-1003",
-    timestamp: "2026-06-15 14:04:45",
-    title: "Impossible Travel Alert",
-    severity: "medium",
-    status: "Triage",
-    threatType: "Credential Abuse & Impossible Travel",
-    rootCause: "The user account `alice@corp.com` authenticated successfully from New York, US at 13:45:00. Just 15 minutes later, at 14:00:15, the same user authenticated from London, UK via a VPN gateway. The geographical distance between New York and London (~3,500 miles) is physically impossible to traverse in 15 minutes. The secondary session from London was immediately utilized to map corporate file shares and access highly sensitive finance and strategy documents.",
-    summary: "Impossible travel alert: alice@corp.com logged on from New York and London within 15 minutes. The session in London was used to access confidential payroll and strategy files, suggesting session hijacking or credential theft.",
-    keyArtifacts: {
-      sourceIps: ["198.51.100.10", "203.0.113.102"],
-      targetSystems: ["AD-CONTROLLER-01", "Exchange-Mail-01", "File-Share-01"],
-      affectedUsers: ["alice@corp.com"],
-      signatures: ["EventID=4624 (Logon Success)", "Impossible travel speed", "Access to sensitive shares"]
-    },
-    recommendedActions: [
-      "Revoke all active tokens/sessions for `alice@corp.com` in Active Directory and Azure AD.",
-      "Reset the password for user `alice@corp.com` and force re-registration of MFA devices.",
-      "Block the suspicious IP `203.0.113.102` (London) on the firewall and VPN gateway.",
-      "Quarantine workstation linked to IP `198.51.100.10` to scan for keyloggers or token-stealing malware.",
-      "Verify if Alice is traveling or if she shared credentials/VPN configurations."
-    ],
-    completedActions: [],
-    timeline: [
-      { time: "13:45:00", event: "US Logon", details: "Success logon from workstation in New York, US (Legitimate user IP)." },
-      { time: "13:52:12", event: "Mail Access", details: "Alice accesses Exchange email from the same US workstation." },
-      { time: "14:00:15", event: "UK VPN Logon", details: "Successful VPN logon from London, UK using valid credentials (Session compromise)." },
-      { time: "14:02:10", event: "Sensitive Access", details: "Attacker accesses Q2 Salaries spreadsheet on file share server." },
-      { time: "14:03:00", event: "Strategic Access", details: "Attacker opens mergers and acquisitions document on the same file share." }
-    ],
-    logs: PRESETS.suspiciousAuth.logs,
-    chatHistory: [
-      { role: "assistant", content: "I've flagged this Impossible Travel incident. The access of '2026_Q2_Salaries.xlsx' is highly concerning. I recommend immediately locking Alice's AD account to block exfiltration.", timestamp: "14:05:00" }
-    ],
-    mocked: true,
-    modelUsed: "MOCK ENGINE"
-  }
-];
+// Severity Palette for Recharts Pie Chart
+const SEVERITY_COLORS = {
+  CRITICAL: "#f87171", // Light Red
+  HIGH: "#fb923c",     // Orange
+  MEDIUM: "#f59e0b",   // Amber
+  LOW: "#38bdf8"       // Light Blue
+};
 
-// Utility function to generate unique incident IDs outside of component render scope
+// Generate unique incident IDs outside of component render scope
 const generateIncidentId = () => {
   return `INC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 };
 
 export default function Home() {
-  const [activeView, setActiveView] = useState("dashboard");
+  const router = useRouter();
   
-  // Lazy state initializers to prevent setState in useEffect warning
-  const [incidents, setIncidents] = useState(() => {
-    if (typeof window !== "undefined") {
-      const storedIncidents = localStorage.getItem("sentinel_incidents");
-      if (storedIncidents) {
-        try {
-          return JSON.parse(storedIncidents);
-        } catch (e) {
-          console.error("Failed to parse stored incidents:", e);
-          return INITIAL_INCIDENTS;
-        }
-      }
-    }
-    return INITIAL_INCIDENTS;
-  });
+  // Auth & Session States
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
 
+  // Layout View States
+  const [activeView, setActiveView] = useState("dashboard");
+  const [incidents, setIncidents] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  
+  // Recharts Chart Telemetry State Arrays
+  const [trendsData, setTrendsData] = useState([]);
+  const [severityData, setSeverityData] = useState([]);
+  const [resolutionData, setResolutionData] = useState([]);
+  const [workloadData, setWorkloadData] = useState([]);
+  const [categoryData, setCategoryData] = useState([]);
+
+  // Detailed State Management
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [logsInput, setLogsInput] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -193,64 +120,138 @@ export default function Home() {
   const chatEndRef = useRef(null);
 
   // Settings states with lazy initialization
-  const [openaiKey, setOpenaiKey] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("sentinel_openai_key") || "";
-    }
-    return "";
-  });
-
-  const [selectedModel, setSelectedModel] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("sentinel_model") || "gpt-4o-mini";
-    }
-    return "gpt-4o-mini";
-  });
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [selectedModel, setSelectedModel] = useState("gpt-4o-mini");
 
   // Notifications
   const [alertBanner, setAlertBanner] = useState(null);
 
-  // Splunk MCP Integration State
+  // Create Incident Form State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newIncTitle, setNewIncTitle] = useState("");
+  const [newIncSeverity, setNewIncSeverity] = useState("MEDIUM");
+  const [newIncLogs, setNewIncLogs] = useState("");
+
+  // Report Center Filters
+  const [reportSearch, setReportSearch] = useState("");
+  const [reportSeverityFilter, setReportSeverityFilter] = useState("ALL");
+  const [reportAnalystFilter, setReportAnalystFilter] = useState("ALL");
+  const [reportSort, setReportSort] = useState("desc");
+
+  // Splunk HEC / Streaming Mock Config State
   const [splunkHost, setSplunkHost] = useState("https://splunk-mcp.corp.local:8089");
   const [splunkToken, setSplunkToken] = useState("••••••••••••••••••••");
   const [splunkIndex, setSplunkIndex] = useState("security");
+  const [hecToken, setHecToken] = useState("a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d");
+  const [hecEnabled, setHecEnabled] = useState(false);
   const [mcpStatus, setMcpStatus] = useState("idle");
   const [mcpLogs, setMcpLogs] = useState([]);
 
-  const testMcpConnection = () => {
-    setMcpStatus("testing");
-    setMcpLogs(["[MCP_INIT] Instantiating JSON-RPC over WebSockets...", "[MCP_HANDSHAKE] Sending schema verification request..."]);
-    
-    setTimeout(() => {
-      setMcpLogs(prev => [...prev, "[MCP_SCHEMA] Schema validated successfully. Protocol Version: 1.0.0", "[SPLUNK_API] Pinging Splunk REST Daemon on host..."]);
-    }, 1000);
+  // Retrieve current database metrics
+  const refreshTelemetry = async () => {
+    const { data: incs } = await getIncidents();
+    if (incs) setIncidents(incs);
 
-    setTimeout(() => {
-      setMcpLogs(prev => [...prev, "[SPLUNK_API] Response: 200 OK (Version: 9.2.1)", "[SPLUNK_DB] Querying index namespaces..."]);
-    }, 2000);
+    const { data: reps } = await getReports();
+    if (reps) setReports(reps);
 
-    setTimeout(() => {
-      setMcpLogs(prev => [...prev, `[SPLUNK_DB] Success: Index '${splunkIndex}' target verified.`, "[MCP_READY] Model Context Protocol Bridge Established!"]);
-      setMcpStatus("success");
-      triggerToast("Splunk MCP Connection Established", "success");
-    }, 3000);
+    const { data: logs } = await getAuditLogs();
+    if (logs) setAuditLogs(logs);
   };
 
-  // Set default database on mount if missing
+  // Load and check credentials/session on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("sentinel_incidents");
-      if (!stored) {
-        localStorage.setItem("sentinel_incidents", JSON.stringify(INITIAL_INCIDENTS));
-      }
-    }
-  }, []);
+    const session = getSessionUser();
+    if (!session) {
+      router.push("/login");
+    } else {
+      // Async state initialization to avoid synchronous cascading renders
+      setTimeout(() => {
+        setCurrentUser(session);
+        setAuthLoading(false);
+        
+        if (typeof window !== "undefined") {
+          setOpenaiKey(localStorage.getItem("sentinel_openai_key") || "");
+          setSelectedModel(localStorage.getItem("sentinel_model") || "gpt-4o-mini");
+        }
 
-  // Sync incidents with localStorage
-  const saveIncidents = (updatedList) => {
-    setIncidents(updatedList);
-    localStorage.setItem("sentinel_incidents", JSON.stringify(updatedList));
-  };
+        refreshTelemetry();
+        setIsMounted(true);
+      }, 0);
+    }
+  }, [router]);
+
+  // Reactive Recharts Data Computations (Asynchronous to avoid synchronous cascading render warnings)
+  useEffect(() => {
+    if (incidents.length === 0) return;
+
+    // 1. Trends Data (Volume last 6 days)
+    const dates = {};
+    const nowMs = Date.now();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(nowMs - 3600000 * 24 * i).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      dates[d] = 0;
+    }
+    incidents.forEach(inc => {
+      const dStr = new Date(inc.created_at || inc.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      if (dates[dStr] !== undefined) {
+        dates[dStr]++;
+      }
+    });
+
+    // 2. Severity Data
+    const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+    incidents.forEach(inc => {
+      const sev = String(inc.severity || "MEDIUM").toUpperCase();
+      if (counts[sev] !== undefined) counts[sev]++;
+    });
+    const total = incidents.length || 1;
+
+    // 3. Resolution Data
+    let resolved = 0;
+    let active = 0;
+    incidents.forEach(inc => {
+      if (inc.status === "Resolved") {
+        resolved++;
+      } else {
+        active++;
+      }
+    });
+
+    // 4. Workload Data
+    const analysts = {};
+    incidents.forEach(inc => {
+      const analyst = inc.assigned_analyst || "Unassigned";
+      analysts[analyst] = (analysts[analyst] || 0) + 1;
+    });
+
+    // 5. Threat Categories
+    const cats = {};
+    incidents.forEach(inc => {
+      const cat = inc.threatType || "Other Alerts";
+      cats[cat] = (cats[cat] || 0) + 1;
+    });
+
+    // Dispatch states asynchronously in a macro-task
+    setTimeout(() => {
+      setTrendsData(Object.entries(dates).map(([date, count]) => ({ date, count })));
+      
+      setSeverityData(Object.entries(counts).map(([name, value]) => ({
+        name,
+        value,
+        percentage: Math.round((value / total) * 100)
+      })));
+      
+      setResolutionData([
+        { name: "Resolved", count: resolved },
+        { name: "Active", count: active }
+      ]);
+      
+      setWorkloadData(Object.entries(analysts).map(([name, count]) => ({ name, count })));
+      
+      setCategoryData(Object.entries(cats).map(([name, count]) => ({ name, count })).slice(0, 5));
+    }, 0);
+  }, [incidents]);
 
   // Scroll to chat bottom
   useEffect(() => {
@@ -267,316 +268,310 @@ export default function Home() {
     }, 4000);
   };
 
-  // File Upload Handlers
-  const handleDragOver = (e) => {
+  // Log Analyst Activity
+  const logSOCActivity = async (actionText, incidentId = null) => {
+    if (currentUser) {
+      await createAuditLog(currentUser.full_name, currentUser.role, actionText, incidentId);
+      const { data: logs } = await getAuditLogs();
+      if (logs) setAuditLogs(logs);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logSOCActivity(`${currentUser?.full_name} logged out from the SOC terminal`);
+    await signOutUser();
+    router.push("/login");
+  };
+
+  // Incident Lifecycle Operations
+  const handleCreateManualIncident = async (e) => {
     e.preventDefault();
-    setDragOver(true);
-  };
+    if (!newIncTitle || !newIncLogs) return;
 
-  const handleDragLeave = () => {
-    setDragOver(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      readLogFile(file);
+    if (currentUser?.role === "Viewer") {
+      triggerToast("Viewer profile restricted from creating incidents", "error");
+      return;
     }
-  };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      readLogFile(file);
-    }
-  };
-
-  const readLogFile = (file) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setLogsInput(event.target.result);
-      triggerToast(`Successfully loaded file: ${file.name}`, "success");
+    const incId = generateIncidentId();
+    const newIncident = {
+      id: incId,
+      title: newIncTitle,
+      severity: newIncSeverity,
+      status: "Open",
+      threatType: "Manual SOC Log Entry",
+      raw_logs: newIncLogs,
+      summary: "Manual incident entry logged by analyst.",
+      rootCause: "Awaiting analyst investigation.",
+      remediation_plan: "Review logs, cross-examine triggers, and document results.",
+      assigned_analyst: currentUser?.full_name,
+      timeline: [{ time: new Date().toLocaleTimeString(), event: "Case Opened", details: "Manual incident created in database." }],
+      recommendedActions: ["Isolate target systems", "Verify access tokens", "Review firewall logging parameters"],
+      completedActions: [],
+      chatHistory: [{ role: "assistant", content: `Incident ${incId} logged. Please upload source logs or converse with me to build containment checklists.`, timestamp: new Date().toLocaleTimeString() }],
+      mocked: true,
+      modelUsed: "MOCK ENGINE"
     };
-    reader.onerror = () => {
-      triggerToast("Failed to read log file", "error");
-    };
-    reader.readAsText(file);
-  };
 
-  // Trigger preset logs loader
-  const loadPreset = (presetKey) => {
-    const preset = PRESETS[presetKey];
-    if (preset) {
-      setLogsInput(preset.logs);
-      triggerToast(`Loaded Demo Preset: ${preset.name}`, "success");
+    const { data, error } = await createIncident(newIncident);
+    if (error) {
+      triggerToast("Failed to write to database", "error");
+    } else {
+      triggerToast(`Incident ${incId} successfully persisted`, "success");
+      await logSOCActivity(`${currentUser?.full_name} manually created incident ${incId}`, incId);
+      setShowCreateModal(false);
+      setNewIncTitle("");
+      setNewIncLogs("");
+      refreshTelemetry();
     }
   };
 
-  // Run Local/OpenAI Log analysis
+  const handleUpdateStatus = async (statusVal) => {
+    if (!selectedIncident) return;
+    if (currentUser?.role === "Viewer") {
+      triggerToast("Viewer profile restricted from editing incidents", "error");
+      return;
+    }
+
+    const { data, error } = await updateIncident(selectedIncident.id, { status: statusVal });
+    if (error) {
+      triggerToast("Status database update failed", "error");
+    } else {
+      setSelectedIncident(data);
+      triggerToast(`Incident status updated to ${statusVal}`, "success");
+      await logSOCActivity(`${currentUser?.full_name} updated status of ${selectedIncident.id} to ${statusVal}`, selectedIncident.id);
+      refreshTelemetry();
+    }
+  };
+
+  const handleUpdateAssignment = async (analystName) => {
+    if (!selectedIncident) return;
+    if (currentUser?.role === "Viewer") {
+      triggerToast("Viewer profile restricted from assigning incidents", "error");
+      return;
+    }
+
+    const { data, error } = await updateIncident(selectedIncident.id, { assigned_analyst: analystName });
+    if (error) {
+      triggerToast("Assignment database update failed", "error");
+    } else {
+      setSelectedIncident(data);
+      triggerToast(`Incident assigned to ${analystName}`, "success");
+      await logSOCActivity(`${currentUser?.full_name} assigned ${selectedIncident.id} to ${analystName}`, selectedIncident.id);
+      refreshTelemetry();
+    }
+  };
+
+  const handleDeleteRecord = async (incId) => {
+    if (currentUser?.role !== "Admin") {
+      triggerToast("Access Denied: Only Admin role can delete incident records", "error");
+      return;
+    }
+
+    const { success, error } = await deleteIncident(incId);
+    if (error) {
+      triggerToast("Database deletion failed", "error");
+    } else {
+      triggerToast(`Incident ${incId} permanently deleted`, "success");
+      await logSOCActivity(`${currentUser?.full_name} deleted incident record ${incId}`);
+      if (selectedIncident?.id === incId) {
+        setSelectedIncident(null);
+        setActiveView("history");
+      }
+      refreshTelemetry();
+    }
+  };
+
+  // Run AI analysis pipeline
   const runAnalysis = async () => {
-    if (!logsInput.trim()) {
-      triggerToast("Please paste or upload some logs to analyze.", "error");
+    if (!logsInput.trim()) return;
+    if (currentUser?.role === "Viewer") {
+      triggerToast("Viewer role restricted from scanning logs", "error");
       return;
     }
 
     setIsAnalyzing(true);
     setAnalysisProgress(5);
-    setAnalysisPhase("Initializing Heuristics Core...");
+    setAnalysisPhase("Decompressing payload namespaces...");
 
-    const phases = [
-      { progress: 15, text: "Scanning Raw Payload..." },
-      { progress: 35, text: "Extracting Indicators of Compromise (IPs, Ports, Accounts)..." },
-      { progress: 55, text: "Correlating Chronological Incident Events..." },
-      { progress: 75, text: "Running Deep AI Remediation Modeling..." },
-      { progress: 90, text: "Compiling Threat Intelligence Matrix..." },
-      { progress: 95, text: "Formatting Cyber Incident Report..." }
+    const intervals = [
+      { p: 25, t: "Extracting log timelines & headers...", d: 600 },
+      { p: 55, t: "Comparing source IPs reputation vectors...", d: 1200 },
+      { p: 80, t: "Querying Sentinel AI threat models...", d: 1800 },
+      { p: 95, t: "Correlating remediation checklists...", d: 2400 }
     ];
 
-    let currentPhaseIdx = 0;
-    const interval = setInterval(() => {
-      if (currentPhaseIdx < phases.length) {
-        setAnalysisProgress(phases[currentPhaseIdx].progress);
-        setAnalysisPhase(phases[currentPhaseIdx].text);
-        currentPhaseIdx++;
-      }
-    }, 800);
-
-    try {
-      // Call backend API
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          logs: logsInput,
-          apiKey: openaiKey,
-          model: selectedModel
-        })
-      });
-
-      clearInterval(interval);
-      setAnalysisProgress(100);
-      setAnalysisPhase("Analysis Complete!");
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Analysis failed");
-      }
-
-      // Generate a new incident structure
-      const newIncidentId = generateIncidentId();
-      const title = data.threatType || "Anomaly Analysis";
-      
-      const newIncident = {
-        id: newIncidentId,
-        timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-        title: title,
-        severity: data.severity || "medium",
-        status: "Investigating",
-        threatType: data.threatType || "Undetermined Anomaly",
-        rootCause: data.rootCause || "Analysis did not yield a root cause.",
-        summary: data.summary || "Summary of logs scanned.",
-        keyArtifacts: {
-          sourceIps: data.keyArtifacts?.sourceIps || [],
-          targetSystems: data.keyArtifacts?.targetSystems || [],
-          affectedUsers: data.keyArtifacts?.affectedUsers || [],
-          signatures: data.keyArtifacts?.signatures || []
-        },
-        recommendedActions: data.recommendedActions || [],
-        completedActions: [],
-        timeline: data.timeline || [],
-        logs: logsInput,
-        chatHistory: [
-          { 
-            role: "assistant", 
-            content: `Hello, I am Sentinel. I have successfully analyzed the logs under report ${newIncidentId}. Threat profile is identified as ${title} (${data.severity || "medium"} severity). Ask me anything to assist in containment.`, 
-            timestamp: new Date().toLocaleTimeString() 
-          }
-        ],
-        mocked: data.mocked,
-        modelUsed: data.modelUsed
-      };
-
-      const updatedIncidents = [newIncident, ...incidents];
-      saveIncidents(updatedIncidents);
-      setSelectedIncident(newIncident);
-      setLogsInput("");
-      
+    intervals.forEach(step => {
       setTimeout(() => {
-        setIsAnalyzing(false);
-        setActiveView("detail");
-        triggerToast("Incident Analysis Generated!", "success");
-      }, 500);
+        setAnalysisProgress(step.p);
+        setAnalysisPhase(step.t);
+      }, step.d);
+    });
 
-    } catch (err) {
-      clearInterval(interval);
-      setIsAnalyzing(false);
-      triggerToast(err.message || "An error occurred during analysis", "error");
-      console.error(err);
-    }
+    setTimeout(async () => {
+      try {
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            logs: logsInput,
+            apiKey: openaiKey,
+            model: selectedModel
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          triggerToast(data.error, "error");
+          setIsAnalyzing(false);
+          return;
+        }
+
+        const formattedIncident = {
+          id: generateIncidentId(),
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          title: data.threatType || "Unclassified Threat Alert",
+          severity: data.severity || "MEDIUM",
+          status: "Open",
+          threatType: data.threatType || "Anomalous Logs Capture",
+          rootCause: data.rootCause || "Analysis completed.",
+          summary: data.summary || "No description compiled.",
+          keyArtifacts: data.keyArtifacts || { sourceIps: [], targetSystems: [], affectedUsers: [], signatures: [] },
+          recommendedActions: data.recommendedActions || [],
+          completedActions: [],
+          timeline: data.timeline || [],
+          logs: logsInput,
+          chatHistory: [
+            { role: "assistant", content: `Hello! I have completed analyzing report logs for this ${data.threatType || 'threat'}. Ask me anything to assist in mitigation.`, timestamp: new Date().toLocaleTimeString() }
+          ],
+          mocked: data.mocked,
+          modelUsed: data.modelUsed
+        };
+
+        const { data: dbData, error } = await createIncident(formattedIncident);
+        if (error) {
+          triggerToast("Failed to save incident to database", "error");
+        } else {
+          setLogsInput("");
+          setSelectedIncident(dbData);
+          setActiveView("detail");
+          triggerToast("Log analysis complete!", "success");
+          await logSOCActivity(`${currentUser?.full_name} analyzed raw logs and generated incident ${dbData.id}`, dbData.id);
+          refreshTelemetry();
+        }
+      } catch (err) {
+        console.error(err);
+        triggerToast("Failed to compile analysis payloads", "error");
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }, 3200);
   };
 
-  // Interactive AI Chat with logs context
-  const handleSendMessage = async (e) => {
+  // Coprocessor chat submission
+  const handleChatSubmit = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || !selectedIncident) return;
 
-    const userMsg = {
-      role: "user",
-      content: chatInput,
-      timestamp: new Date().toLocaleTimeString()
-    };
+    if (currentUser?.role === "Viewer") {
+      triggerToast("Viewer profile restricted from chatting with logs", "error");
+      return;
+    }
 
-    const updatedIncident = {
-      ...selectedIncident,
-      chatHistory: [...selectedIncident.chatHistory, userMsg]
-    };
-
-    // Update selected incident and list
+    const userMsg = { role: "user", content: chatInput, timestamp: new Date().toLocaleTimeString() };
+    const updatedHistory = [...(selectedIncident.chatHistory || []), userMsg];
+    
+    // Optimistic UI update
+    const updatedIncident = { ...selectedIncident, chatHistory: updatedHistory };
     setSelectedIncident(updatedIncident);
-    const updatedIncidentsList = incidents.map(inc => 
-      inc.id === selectedIncident.id ? updatedIncident : inc
-    );
-    saveIncidents(updatedIncidentsList);
-
     setChatInput("");
     setIsChatting(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          logs: selectedIncident.logs,
-          messages: updatedIncident.chatHistory.map(h => ({ role: h.role, content: h.content })),
+          logs: selectedIncident.logs || "",
+          messages: updatedHistory,
           apiKey: openaiKey,
           model: selectedModel
         })
       });
 
-      const data = await response.json();
+      const reply = await res.json();
+      
+      const assistantMsg = { 
+        role: "assistant", 
+        content: reply.content || "Sentinel completed query mapping successfully.",
+        timestamp: new Date().toLocaleTimeString() 
+      };
 
-      if (!response.ok) {
-        throw new Error(data.error || "Chat failed");
+      const finalHistory = [...updatedHistory, assistantMsg];
+      
+      // Save Chat to DB
+      const { data: savedDbInc } = await updateIncident(selectedIncident.id, { chatHistory: finalHistory });
+      await saveChat(selectedIncident.id, currentUser.full_name, finalHistory);
+
+      if (savedDbInc) {
+        setSelectedIncident(savedDbInc);
+      } else {
+        setSelectedIncident({ ...selectedIncident, chatHistory: finalHistory });
       }
-
-      const assistantMsg = {
-        role: "assistant",
-        content: data.content,
-        timestamp: new Date().toLocaleTimeString()
-      };
-
-      const finalIncident = {
-        ...updatedIncident,
-        chatHistory: [...updatedIncident.chatHistory, assistantMsg]
-      };
-
-      setSelectedIncident(finalIncident);
-      const finalIncidentsList = incidents.map(inc => 
-        inc.id === selectedIncident.id ? finalIncident : inc
-      );
-      saveIncidents(finalIncidentsList);
-      setIsChatting(false);
-
+      
+      await logSOCActivity(`${currentUser?.full_name} queried Sentinel Chat regarding ${selectedIncident.id}`, selectedIncident.id);
     } catch (err) {
+      console.error(err);
+      triggerToast("Failed to get chat response", "error");
+    } finally {
       setIsChatting(false);
-      triggerToast(err.message || "Failed to send message", "error");
-      
-      const errorMsg = {
-        role: "assistant",
-        content: `Error: Could not connect to AI engine. ${err.message}. Please check your connection or OpenAI API Key in Settings.`,
-        timestamp: new Date().toLocaleTimeString()
-      };
-
-      const finalIncident = {
-        ...updatedIncident,
-        chatHistory: [...updatedIncident.chatHistory, errorMsg]
-      };
-
-      setSelectedIncident(finalIncident);
     }
   };
 
-  // Toggle remediation actions checklist
-  const handleToggleAction = (action) => {
-    const isCompleted = selectedIncident.completedActions?.includes(action);
-    const newCompleted = isCompleted
-      ? selectedIncident.completedActions.filter(a => a !== action)
-      : [...(selectedIncident.completedActions || []), action];
-
-    const updatedIncident = {
-      ...selectedIncident,
-      completedActions: newCompleted
-    };
-
-    setSelectedIncident(updatedIncident);
-    const updatedList = incidents.map(inc => 
-      inc.id === selectedIncident.id ? updatedIncident : inc
-    );
-    saveIncidents(updatedList);
+  // Quick Chat Actions
+  const triggerQuickChat = (promptText) => {
+    setChatInput(promptText);
   };
 
-  // Update incident status
-  const handleUpdateStatus = (status) => {
-    const updatedIncident = {
-      ...selectedIncident,
-      status: status
-    };
+  // Containment Checklist Action toggler
+  const handleToggleAction = async (action) => {
+    if (!selectedIncident) return;
+    if (currentUser?.role === "Viewer") {
+      triggerToast("Viewer profile restricted from altering containment playbooks", "error");
+      return;
+    }
 
-    setSelectedIncident(updatedIncident);
-    const updatedList = incidents.map(inc => 
-      inc.id === selectedIncident.id ? updatedIncident : inc
-    );
-    saveIncidents(updatedList);
-    triggerToast(`Incident status updated to ${status}`, "success");
-  };
+    const completed = selectedIncident.completedActions || [];
+    let updatedCompleted;
 
-  // Delete incident from local storage
-  const handleDeleteIncident = (incidentId) => {
-    if (confirm("Are you sure you want to delete this incident from the system database?")) {
-      const updatedList = incidents.filter(inc => inc.id !== incidentId);
-      saveIncidents(updatedList);
-      
-      if (selectedIncident?.id === incidentId) {
-        setSelectedIncident(null);
-        setActiveView("dashboard");
-      }
-      
-      triggerToast("Incident deleted successfully", "success");
+    if (completed.includes(action)) {
+      updatedCompleted = completed.filter(a => a !== action);
+    } else {
+      updatedCompleted = [...completed, action];
+    }
+
+    const { data, error } = await updateIncident(selectedIncident.id, { completedActions: updatedCompleted });
+    if (error) {
+      triggerToast("Checklist database sync failed", "error");
+    } else {
+      setSelectedIncident(data);
+      triggerToast(completed.includes(action) ? "Containment item unchecked" : "Containment item verified", "success");
+      await logSOCActivity(`${currentUser?.full_name} verified remediation checklist item for ${selectedIncident.id}`, selectedIncident.id);
+      refreshTelemetry();
     }
   };
 
-  // Settings configuration save
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    localStorage.setItem("sentinel_openai_key", openaiKey);
-    localStorage.setItem("sentinel_model", selectedModel);
-    triggerToast("Settings saved successfully!", "success");
-  };
-
-  const handleClearDatabase = () => {
-    if (confirm("Reset application? All incidents will be reset to default presets.")) {
-      localStorage.removeItem("sentinel_incidents");
-      setIncidents(INITIAL_INCIDENTS);
-      localStorage.setItem("sentinel_incidents", JSON.stringify(INITIAL_INCIDENTS));
-      setSelectedIncident(null);
-      setActiveView("dashboard");
-      triggerToast("Database reset to defaults", "success");
-    }
-  };
-
-  // Export PDF Report function
-  const handleDownloadPDF = (incident) => {
+  // Compile PDF Report
+  const handleDownloadPDF = async (incident) => {
     try {
       const doc = new jsPDF();
       
-      // Page 1 Background styling
-      doc.setFillColor(8, 12, 24); // dark slate/obsidian
+      // Page 1 Background
+      doc.setFillColor(8, 12, 24); // slate-950
       doc.rect(0, 0, 210, 297, "F");
       
-      // Header Accent line
+      // Top header glow line
       doc.setFillColor(0, 240, 255); // Cyan
       doc.rect(0, 0, 210, 4, "F");
       
@@ -600,14 +595,14 @@ export default function Home() {
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
       doc.text(`Incident ID: ${incident.id}`, 22, 50);
-      doc.text(`Severity: ${incident.severity.toUpperCase()}`, 115, 50);
+      doc.text(`Severity: ${(incident.severity || "MEDIUM").toUpperCase()}`, 115, 50);
       
       doc.setFont("helvetica", "normal");
       doc.setTextColor(226, 232, 240);
       doc.text(`Threat Category: ${incident.threatType}`, 22, 58);
-      doc.text(`Timestamp: ${incident.timestamp}`, 115, 58);
+      doc.text(`Timestamp: ${incident.created_at || incident.timestamp}`, 115, 58);
       doc.text(`Current Status: ${incident.status}`, 22, 66);
-      doc.text(`Analysis Engine: ${incident.modelUsed || "Sentinel Core"}`, 115, 66);
+      doc.text(`Assigned Owner: ${incident.assigned_analyst || "Unassigned"}`, 115, 66);
 
       const completionRate = incident.recommendedActions?.length 
         ? Math.round(((incident.completedActions?.length || 0) / incident.recommendedActions.length) * 100)
@@ -728,141 +723,215 @@ export default function Home() {
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text("CLASSIFICATION: RESTRICTED SECURITY INTEL", 15, 280);
-      doc.text("Generated via Splunk Sentinel Security Operations Center.", 115, 280);
+      doc.text(`Generated by analyst ${currentUser?.full_name}`, 115, 280);
       
+      // Trigger download
       doc.save(`Splunk_Sentinel_Report_${incident.id}.pdf`);
       triggerToast(`PDF exported for incident: ${incident.id}`, "success");
+
+      // Save report record log to Supabase
+      const newReportData = {
+        incident_id: incident.id,
+        name: `Forensic Report - ${incident.title}`,
+        pdf_size_bytes: 48000 + Math.floor(Math.random() * 20000),
+        generated_by: currentUser?.full_name
+      };
+      await createReport(newReportData);
+      await logSOCActivity(`${currentUser?.full_name} generated and downloaded PDF report for ${incident.id}`, incident.id);
+      refreshTelemetry();
     } catch (err) {
       console.error(err);
       triggerToast("Failed to compile and export PDF report.", "error");
     }
   };
 
-  // Stats calculation
-  const totalCount = incidents.length;
-  const criticalCount = incidents.filter(i => i.severity === "critical").length;
-  const activeCount = incidents.filter(i => i.status !== "Resolved").length;
-  const resolvedCount = incidents.filter(i => i.status === "Resolved").length;
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    if (currentUser?.role === "Viewer") {
+      triggerToast("Viewer profile restricted from saving core settings", "error");
+      return;
+    }
+    localStorage.setItem("sentinel_openai_key", openaiKey);
+    localStorage.setItem("sentinel_model", selectedModel);
+    triggerToast("Core settings saved locally", "success");
+    logSOCActivity(`${currentUser?.full_name} updated LLM settings models to ${selectedModel}`);
+  };
 
-  // Severity style mapping helper
-  const getSeverityBadge = (severity) => {
-    switch (severity) {
-      case "critical":
-        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyber-red/20 text-cyber-red border border-cyber-red/30 shadow-red-glow">CRITICAL</span>;
-      case "high":
-        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyber-amber/20 text-cyber-amber border border-cyber-amber/30">HIGH</span>;
-      case "medium":
-        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-yellow-500/20 text-yellow-500 border border-yellow-500/30">MEDIUM</span>;
-      default:
-        return <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyber-green/20 text-cyber-green border border-cyber-green/30">LOW</span>;
+  const loadPreset = (presetKey) => {
+    const prs = PRESETS[presetKey];
+    if (prs) {
+      setLogsInput(prs.logs);
+      triggerToast(`Preset '${presetKey}' loaded. Ready for analysis.`, "success");
     }
   };
 
-  // Status style mapping helper
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setLogsInput(event.target.result);
+        triggerToast(`Successfully loaded file: ${file.name}`, "success");
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setLogsInput(event.target.result);
+        triggerToast(`Successfully loaded file: ${file.name}`, "success");
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Search & Filtered Reports for Report Center
+  const getFilteredReports = () => {
+    return reports
+      .filter(rep => {
+        const matchesSearch = rep.incident_id.toLowerCase().includes(reportSearch.toLowerCase()) || 
+                             rep.name.toLowerCase().includes(reportSearch.toLowerCase());
+        const matchesAnalyst = reportAnalystFilter === "ALL" || rep.generated_by === reportAnalystFilter;
+        
+        // Match severity by joining back to incidents table
+        const matchingInc = incidents.find(inc => inc.id === rep.incident_id);
+        const matchesSeverity = reportSeverityFilter === "ALL" || 
+                               (matchingInc && matchingInc.severity.toUpperCase() === reportSeverityFilter);
+
+        return matchesSearch && matchesAnalyst && matchesSeverity;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.created_at);
+        const dateB = new Date(b.created_at);
+        return reportSort === "desc" ? dateB - dateA : dateA - dateB;
+      });
+  };
+
+  // Get active status badge color
+  const getSeverityBadge = (sev) => {
+    const colors = {
+      critical: "bg-cyber-red/10 border-cyber-red/30 text-cyber-red",
+      high: "bg-cyber-amber/10 border-cyber-amber/30 text-cyber-amber",
+      medium: "bg-yellow-500/10 border-yellow-500/30 text-yellow-500",
+      low: "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan"
+    };
+    const s = String(sev).toLowerCase();
+    return (
+      <span className={`px-2 py-0.5 border rounded text-[10px] font-mono font-bold uppercase tracking-wider ${colors[s] || "border-slate-400 text-slate-400"}`}>
+        {sev}
+      </span>
+    );
+  };
+
   const getStatusBadge = (status) => {
-    switch (status) {
-      case "Resolved":
-        return <span className="px-2 py-0.5 rounded text-xs font-mono bg-cyber-green/10 text-cyber-green border border-cyber-green/20">RESOLVED</span>;
-      case "Investigating":
-        return <span className="px-2 py-0.5 rounded text-xs font-mono bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20 animate-pulse">INVESTIGATING</span>;
-      default:
-        return <span className="px-2 py-0.5 rounded text-xs font-mono bg-cyber-gray/10 text-cyber-gray border border-cyber-gray/20">TRIAGE</span>;
-    }
+    const colors = {
+      Open: "border-cyber-gray text-cyber-gray bg-cyber-card-light/20",
+      Investigating: "border-cyber-cyan text-cyber-cyan bg-cyber-cyan/10 animate-pulse",
+      Contained: "border-purple-400 text-purple-400 bg-purple-400/10",
+      Resolved: "border-cyber-green text-cyber-green bg-cyber-green/10"
+    };
+    return (
+      <span className={`px-2 py-0.5 border rounded text-[10px] font-mono font-bold tracking-wider ${colors[status] || "border-slate-400 text-slate-400"}`}>
+        {status}
+      </span>
+    );
   };
 
-  // Threat category breakdown map
-  const threatTypeCount = {};
-  incidents.forEach(inc => {
-    const type = inc.threatType || "Other Anomalies";
-    threatTypeCount[type] = (threatTypeCount[type] || 0) + 1;
-  });
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-cyber-bg flex items-center justify-center font-mono text-cyber-cyan text-xs">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin filter drop-shadow-[0_0_8px_#00f0ff]" />
+          <span>AUTHENTICATING SOC CREDENTIALS...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Pre-calculated Dashboard Counts
+  const criticalCount = incidents.filter(inc => String(inc.severity).toLowerCase() === "critical").length;
+  const activeCount = incidents.filter(inc => inc.status !== "Resolved").length;
+  const resolvedCount = incidents.filter(inc => inc.status === "Resolved").length;
+  const mitigationRate = incidents.length ? Math.round((resolvedCount / incidents.length) * 100) : 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-cyber-bg text-cyber-text cyber-grid relative font-sans">
+    <div className="min-h-screen bg-cyber-bg text-slate-300 flex flex-col font-mono relative overflow-hidden select-none">
       
-      {/* Toast Alert popup */}
+      {/* Background Grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#00f0ff03_1px,transparent_1px),linear-gradient(to_bottom,#00f0ff03_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none"></div>
+
+      {/* Temporal Toast Banner */}
       {alertBanner && (
-        <div className={`fixed bottom-4 right-4 z-[99999] p-4 rounded border font-mono text-sm flex items-center gap-3 shadow-lg transition-all duration-300 ${
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded border text-xs font-mono flex items-center gap-2 shadow-lg backdrop-blur-md transition-all duration-300 animate-slideIn ${
           alertBanner.type === "success" 
-            ? "bg-cyber-bg/95 border-cyber-green text-cyber-green shadow-green-glow" 
-            : "bg-cyber-bg/95 border-cyber-red text-cyber-red shadow-red-glow"
+            ? "bg-cyber-green/10 border-cyber-green/40 text-cyber-green shadow-green-glow" 
+            : "bg-cyber-red/10 border-cyber-red/40 text-cyber-red shadow-red-glow"
         }`}>
-          <div className={`w-2 h-2 rounded-full ${alertBanner.type === "success" ? "bg-cyber-green" : "bg-cyber-red"}`}></div>
+          <ShieldAlert className="w-4 h-4" />
           <span>{alertBanner.message}</span>
         </div>
       )}
 
-      {/* Cyber Top bar */}
-      <header className="border-b border-cyber-border bg-cyber-bg/90 backdrop-blur-md px-6 py-4 flex items-center justify-between z-40 relative">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setActiveView("dashboard"); setSelectedIncident(null); }}>
-          <div className="relative flex items-center justify-center w-10 h-10 border border-cyber-cyan rounded bg-cyber-cyan/15 shadow-cyan-glow">
-            <ShieldAlert className="w-6 h-6 text-cyber-cyan" />
-            <div className="absolute inset-0 border border-cyber-cyan/30 rounded animate-ping pointer-events-none"></div>
+      {/* TOP HEADER */}
+      <header className="border-b border-cyber-border bg-cyber-card/60 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 z-10">
+        <div className="flex items-center gap-3">
+          <div className="p-2 border border-cyber-cyan/30 bg-cyber-cyan/5 rounded-lg shadow-cyan-glow">
+            <ShieldAlert className="w-5 h-5 text-cyber-cyan animate-pulse" />
           </div>
           <div>
-            <h1 className="text-xl font-bold font-mono tracking-wider text-white text-shadow-cyan flex items-center gap-1.5">
+            <h1 className="text-lg font-bold tracking-widest text-white flex items-center gap-2">
               SPLUNK <span className="text-cyber-cyan">SENTINEL</span>
             </h1>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <p className="text-[9px] font-mono text-cyber-gray tracking-widest uppercase">AI Incident Response Intelligence</p>
-              <span className="text-[8px] font-mono px-1.5 py-0.5 border border-cyber-cyan/30 bg-cyber-cyan/5 text-cyber-cyan rounded">DESIGNED FOR SPLUNK MCP INTEGRATION</span>
-            </div>
+            <p className="text-[9px] text-cyber-gray tracking-wider uppercase mt-0.5">
+              AI-Powered Incident Response Copilot
+            </p>
           </div>
         </div>
 
-        {/* System telemetry dashboard */}
-        <div className="hidden md:flex items-center gap-6 text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyber-green animate-pulse"></span>
-            <span className="text-cyber-gray">HEURISTIC ENGINE:</span>
-            <span className="text-cyber-green">ACTIVE</span>
+        {/* Global Live Badges */}
+        <div className="flex flex-wrap items-center gap-4 text-[10px]">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 border border-cyber-green/20 bg-cyber-green/5 text-cyber-green rounded">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyber-green animate-ping"></span>
+            <span className="font-bold uppercase text-[9px]">HEURISTIC ENGINE: ACTIVE</span>
           </div>
-          <div className="flex items-center gap-2 border border-cyber-border px-2.5 py-1 rounded bg-black/40">
-            <span className="text-cyber-gray">AI STATUS:</span>
-            {openaiKey ? (
-              <span className="text-cyber-green font-bold flex items-center gap-1 shadow-green-glow">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyber-green inline-block animate-pulse"></span>
-                OPENAI CONNECTED
-              </span>
-            ) : (
-              <span className="text-yellow-500 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block animate-pulse"></span>
-                MOCK MODE
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-cyber-gray">CONNECTED INCIDENTS:</span>
-            <span className="text-white font-bold">{totalCount}</span>
-          </div>
-        </div>
 
-        {/* Demo Mode trigger */}
-        <div className="flex items-center gap-3">
-          <div className="relative group">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold text-cyber-cyan border border-cyber-cyan/40 bg-cyber-cyan/10 rounded hover:bg-cyber-cyan/20 hover:shadow-cyan-glow transition-all">
-              <Play className="w-3.5 h-3.5" />
-              <span>LOAD DEMO INCIDENT</span>
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 border rounded ${
+            openaiKey || !isMockMode()
+              ? "border-cyber-green/20 bg-cyber-green/5 text-cyber-green"
+              : "border-yellow-500/20 bg-yellow-500/5 text-yellow-500"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${openaiKey || !isMockMode() ? "bg-cyber-green" : "bg-yellow-500 animate-pulse"}`}></span>
+            <span className="font-bold uppercase text-[9px]">{openaiKey || !isMockMode() ? "OPENAI CONNECTED" : "AI ENGINE: MOCK MODE"}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                if (currentUser?.role === "Viewer") {
+                  triggerToast("Viewer profile restricted from creating incidents", "error");
+                } else {
+                  setShowCreateModal(true);
+                }
+              }}
+              className="px-3 py-1 bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan rounded hover:bg-cyber-cyan hover:text-cyber-bg text-[10px] font-bold tracking-wider transition-all cursor-pointer flex items-center gap-1 uppercase"
+            >
+              <Plus className="w-3 h-3" /> New Incident
             </button>
-            <div className="absolute right-0 mt-2 w-56 rounded border border-cyber-border bg-cyber-card/95 shadow-xl hidden group-hover:block hover:block z-50 overflow-hidden">
-              <div className="px-3 py-2 text-[10px] font-mono text-cyber-gray border-b border-cyber-border uppercase bg-cyber-bg/50">Select Threat Logs</div>
-              <button onClick={() => { loadPreset("bruteForce"); setActiveView("analyzer"); }} className="w-full text-left px-4 py-2.5 text-xs font-mono hover:bg-cyber-cyan/10 hover:text-cyber-cyan border-b border-cyber-border/40 text-left transition-colors flex items-center justify-between">
-                <span>SSH Brute Force</span>
-                <span className="text-[10px] text-cyber-red bg-cyber-red/10 px-1 rounded">CRITICAL</span>
-              </button>
-              <button onClick={() => { loadPreset("sqlInjection"); setActiveView("analyzer"); }} className="w-full text-left px-4 py-2.5 text-xs font-mono hover:bg-cyber-cyan/10 hover:text-cyber-cyan border-b border-cyber-border/40 text-left transition-colors flex items-center justify-between">
-                <span>Web SQL Injection</span>
-                <span className="text-[10px] text-cyber-amber bg-cyber-amber/10 px-1 rounded">HIGH</span>
-              </button>
-              <button onClick={() => { loadPreset("privilegeEscalation"); setActiveView("analyzer"); }} className="w-full text-left px-4 py-2.5 text-xs font-mono hover:bg-cyber-cyan/10 hover:text-cyber-cyan border-b border-cyber-border/40 text-left transition-colors flex items-center justify-between">
-                <span>Linux Privilege Escalation</span>
-                <span className="text-[10px] text-cyber-amber bg-cyber-amber/10 px-1 rounded">HIGH</span>
-              </button>
-              <button onClick={() => { loadPreset("suspiciousAuth"); setActiveView("analyzer"); }} className="w-full text-left px-4 py-2.5 text-xs font-mono hover:bg-cyber-cyan/10 hover:text-cyber-cyan text-left transition-colors flex items-center justify-between">
-                <span>Impossible Travel</span>
-                <span className="text-[10px] text-yellow-500 bg-yellow-500/10 px-1 rounded">MEDIUM</span>
-              </button>
-            </div>
           </div>
         </div>
       </header>
@@ -871,7 +940,7 @@ export default function Home() {
       <div className="flex-1 flex flex-col md:flex-row relative">
 
         {/* Sidebar Nav */}
-        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-cyber-border bg-cyber-card/40 flex flex-row md:flex-col p-4 gap-2 z-10 overflow-x-auto md:overflow-x-visible whitespace-nowrap md:whitespace-normal scrollbar-none">
+        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-cyber-border bg-cyber-card/40 flex flex-row md:flex-col p-4 gap-2 z-10 overflow-x-auto md:overflow-x-visible whitespace-nowrap md:whitespace-normal scrollbar-none flex-shrink-0">
           <div className="hidden md:block px-3 py-2 text-[10px] font-mono text-cyber-gray tracking-wider uppercase mb-2">SOC Navigation</div>
           
           <button 
@@ -911,6 +980,18 @@ export default function Home() {
           </button>
 
           <button 
+            onClick={() => { setActiveView("reports"); }}
+            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+              activeView === "reports" 
+                ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
+                : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>REPORT CENTER</span>
+          </button>
+
+          <button 
             onClick={() => { setActiveView("splunk-mcp"); }}
             className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
               activeView === "splunk-mcp" 
@@ -934,189 +1015,267 @@ export default function Home() {
             <span>SYSTEM SETTINGS</span>
           </button>
 
-          {/* Quick-Stats inside Sidebar on Desktop */}
-          <div className="hidden md:flex flex-col mt-auto border-t border-cyber-border pt-4 gap-3">
-            <div className="px-3 text-[10px] font-mono text-cyber-gray tracking-wider uppercase">Active Threat Status</div>
-            <div className="flex items-center justify-between px-3 text-xs font-mono">
-              <span className="text-cyber-red">Critical Issues:</span>
-              <span className="font-bold text-white bg-cyber-red/10 px-1.5 py-0.5 rounded border border-cyber-red/25">{criticalCount}</span>
+          {/* User profile & Logout Box */}
+          {currentUser && (
+            <div className="hidden md:flex flex-col mt-auto border-t border-cyber-border pt-4 gap-3">
+              <div className="px-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full border border-cyber-cyan/40 bg-cyber-cyan/5 flex items-center justify-center text-cyber-cyan text-xs font-bold font-mono">
+                  {currentUser.full_name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-white truncate">{currentUser.full_name}</div>
+                  <div className={`text-[8px] font-bold uppercase inline-block border px-1 rounded ${
+                    currentUser.role === 'Admin' ? 'border-cyber-red/40 bg-cyber-red/5 text-cyber-red' :
+                    currentUser.role === 'Security Analyst' ? 'border-cyber-cyan/40 bg-cyber-cyan/5 text-cyber-cyan' :
+                    'border-slate-500 bg-slate-500/5 text-slate-400'
+                  }`}>
+                    {currentUser.role}
+                  </div>
+                </div>
+              </div>
+              
+              <button
+                onClick={handleLogout}
+                className="w-full py-2 bg-cyber-red/10 border border-cyber-red/30 hover:bg-cyber-red/20 text-cyber-red rounded text-[10px] font-bold tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" /> LOG OUT TERMINAL
+              </button>
             </div>
-            <div className="flex items-center justify-between px-3 text-xs font-mono">
-              <span className="text-cyber-cyan">Investigating:</span>
-              <span className="font-bold text-white bg-cyber-cyan/10 px-1.5 py-0.5 rounded border border-cyber-cyan/25">{activeCount}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 text-xs font-mono">
-              <span className="text-cyber-green">Closed Cases:</span>
-              <span className="font-bold text-white bg-cyber-green/10 px-1.5 py-0.5 rounded border border-cyber-green/25">{resolvedCount}</span>
-            </div>
-          </div>
+          )}
         </aside>
 
-        {/* Content Panel */}
-        <main className="flex-1 p-6 relative overflow-y-auto max-w-full">
-          
+        {/* WORKSPACE AREA */}
+        <main className="flex-1 p-6 overflow-y-auto z-10">
+
           {/* VIEW: DASHBOARD */}
           {activeView === "dashboard" && (
             <div className="space-y-6 animate-fadeIn">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-cyber-border/40 pb-4">
+              
+              {/* Row 1: Header */}
+              <div className="border-b border-cyber-border/40 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold font-mono text-white tracking-wide flex items-center gap-2">
-                    <LayoutDashboard className="w-6 h-6 text-cyber-cyan" /> SECURITY OPERATION CENTER DASHBOARD
+                    <LayoutDashboard className="w-6 h-6 text-cyber-cyan" /> SECURITY OPERATIONS CENTER DASHBOARD
                   </h2>
-                  <p className="text-xs text-cyber-gray mt-1">Real-time heuristics monitoring, threat statistics, and active investigations log.</p>
+                  <p className="text-xs text-cyber-gray mt-1">Real-time database analytics, active investigation logs, and workload metrics.</p>
                 </div>
-                
-                <button 
-                  onClick={() => setActiveView("analyzer")}
-                  className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-mono font-bold text-cyber-bg bg-cyber-cyan border border-cyber-cyan rounded hover:shadow-cyan-glow hover:bg-transparent hover:text-cyber-cyan transition-all"
-                >
-                  <Plus className="w-4 h-4" /> NEW INCIDENT SCAN
-                </button>
+                <div className="text-xs text-cyber-gray font-mono">
+                  ACTIVE DEPLOYMENT PORT: <span className="text-cyber-cyan">localhost:3000</span>
+                </div>
               </div>
 
-              {/* 4 Glowing Statistics Widgets */}
+              {/* Row 2: Info Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
-                <div className="p-4 rounded border border-cyber-border bg-cyber-card relative overflow-hidden flex flex-col justify-between h-28 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-cyber-gray tracking-wider uppercase">Total Logs Scanned</span>
-                    <Database className="w-4 h-4 text-cyber-gray" />
+                <div className="p-4 border border-cyber-border bg-cyber-card/40 rounded flex items-center justify-between relative overflow-hidden">
+                  <div className="space-y-1 z-10">
+                    <span className="text-[10px] text-cyber-gray font-mono tracking-wider uppercase block">Total Scanned Events</span>
+                    <span className="text-3xl font-bold text-white font-mono">{incidents.length}</span>
+                    <span className="text-[9px] text-cyber-cyan font-mono block">Persistent DB Sync Active</span>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-mono font-black text-white">{totalCount}</span>
-                    <span className="text-[10px] text-cyber-gray font-mono">records cached</span>
-                  </div>
-                  <div className="text-[10px] font-mono text-cyber-green flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyber-green inline-block"></span>
-                    Local Storage DB Connected
-                  </div>
-                  <div className="absolute right-0 bottom-0 w-24 h-24 bg-cyber-cyan/5 rounded-full filter blur-xl"></div>
+                  <Database className="w-10 h-10 text-cyber-cyan/15 absolute right-4 top-1/2 -translate-y-1/2" />
                 </div>
 
-                <div className="p-4 rounded border border-cyber-red/40 bg-cyber-card relative overflow-hidden flex flex-col justify-between h-28 shadow-red-glow">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-cyber-red tracking-wider uppercase">Critical Alerts</span>
-                    <ShieldAlert className="w-4 h-4 text-cyber-red" />
+                <div className="p-4 border border-cyber-border bg-cyber-card/40 rounded flex items-center justify-between relative overflow-hidden">
+                  <div className="space-y-1 z-10">
+                    <span className="text-[10px] text-cyber-gray font-mono tracking-wider uppercase block">Critical Alerts</span>
+                    <span className="text-3xl font-bold text-cyber-red font-mono">{criticalCount}</span>
+                    <span className="text-[9px] text-cyber-red font-mono block">Requires Immediate Triage</span>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-mono font-black text-cyber-red text-shadow-red">{criticalCount}</span>
-                    <span className="text-[10px] text-cyber-red font-mono">active breaches</span>
-                  </div>
-                  <div className="text-[10px] font-mono text-cyber-red/80">Requires immediate containment</div>
-                  <div className="absolute right-0 bottom-0 w-24 h-24 bg-cyber-red/5 rounded-full filter blur-xl"></div>
+                  <ShieldAlert className="w-10 h-10 text-cyber-red/15 absolute right-4 top-1/2 -translate-y-1/2" />
                 </div>
 
-                <div className="p-4 rounded border border-cyber-cyan/40 bg-cyber-card relative overflow-hidden flex flex-col justify-between h-28 shadow-cyan-glow">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-cyber-cyan tracking-wider uppercase">Active Threats</span>
-                    <Activity className="w-4 h-4 text-cyber-cyan" />
+                <div className="p-4 border border-cyber-border bg-cyber-card/40 rounded flex items-center justify-between relative overflow-hidden">
+                  <div className="space-y-1 z-10">
+                    <span className="text-[10px] text-cyber-gray font-mono tracking-wider uppercase block">Active Investigations</span>
+                    <span className="text-3xl font-bold text-cyber-cyan font-mono">{activeCount}</span>
+                    <span className="text-[9px] text-cyber-cyan font-mono block">Under Containment Operations</span>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-mono font-black text-cyber-cyan text-shadow-cyan">{activeCount}</span>
-                    <span className="text-[10px] text-cyber-cyan font-mono">under investigation</span>
-                  </div>
-                  <div className="text-[10px] font-mono text-cyber-cyan/80">Active sockets & forensic tasks</div>
-                  <div className="absolute right-0 bottom-0 w-24 h-24 bg-cyber-cyan/5 rounded-full filter blur-xl"></div>
+                  <Activity className="w-10 h-10 text-cyber-cyan/15 absolute right-4 top-1/2 -translate-y-1/2 animate-pulse" />
                 </div>
 
-                <div className="p-4 rounded border border-cyber-green/40 bg-cyber-card relative overflow-hidden flex flex-col justify-between h-28 shadow-green-glow">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-cyber-green tracking-wider uppercase">Mitigated Incidents</span>
-                    <CheckCircle className="w-4 h-4 text-cyber-green" />
+                <div className="p-4 border border-cyber-border bg-cyber-card/40 rounded flex items-center justify-between relative overflow-hidden">
+                  <div className="space-y-1 z-10">
+                    <span className="text-[10px] text-cyber-gray font-mono tracking-wider uppercase block">Mitigation Rate</span>
+                    <span className="text-3xl font-bold text-cyber-green font-mono">{mitigationRate}%</span>
+                    <span className="text-[9px] text-cyber-green font-mono block">{resolvedCount} Cases Contained</span>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-mono font-black text-cyber-green">{resolvedCount}</span>
-                    <span className="text-[10px] text-cyber-green font-mono">cases closed</span>
-                  </div>
-                  <div className="text-[10px] font-mono text-cyber-green/80">Remediation checklist applied</div>
-                  <div className="absolute right-0 bottom-0 w-24 h-24 bg-cyber-green/5 rounded-full filter blur-xl"></div>
+                  <CheckCircle className="w-10 h-10 text-cyber-green/15 absolute right-4 top-1/2 -translate-y-1/2" />
                 </div>
 
               </div>
 
-              {/* Threat Distribution Chart & Quick Logs Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Left Panel: Threat breakdown */}
-                <div className="lg:col-span-1 p-5 rounded border border-cyber-border bg-cyber-card/60 flex flex-col gap-4">
-                  <div className="border-b border-cyber-border/40 pb-2 flex items-center justify-between">
-                    <h3 className="font-mono text-sm font-bold text-white tracking-wider">THREAT VECTOR BREAKDOWN</h3>
-                    <Terminal className="w-4 h-4 text-cyber-cyan" />
-                  </div>
-                  <div className="flex-1 flex flex-col justify-center gap-4 py-2">
-                    {Object.keys(threatTypeCount).length > 0 ? (
-                      Object.entries(threatTypeCount).map(([type, count]) => {
-                        const pct = Math.round((count / totalCount) * 100);
-                        return (
-                          <div key={type} className="space-y-1.5">
-                            <div className="flex justify-between text-xs font-mono">
-                              <span className="text-slate-300 truncate max-w-[80%]">{type}</span>
-                              <span className="text-cyber-cyan font-bold">{count} ({pct}%)</span>
-                            </div>
-                            <div className="w-full bg-cyber-bg h-2 rounded overflow-hidden border border-cyber-border/60">
-                              <div 
-                                className="bg-cyber-cyan h-full rounded shadow-cyan-glow transition-all duration-1000"
-                                style={{ width: `${pct}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="text-center py-6 text-xs text-cyber-gray font-mono">No threat vectors logged yet.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Panel: Recent Incidents List */}
-                <div className="lg:col-span-2 p-5 rounded border border-cyber-border bg-cyber-card/60 flex flex-col gap-4">
-                  <div className="border-b border-cyber-border/40 pb-2 flex items-center justify-between">
-                    <h3 className="font-mono text-sm font-bold text-white tracking-wider">RECENT INCIDENT LOGS</h3>
-                    <span className="text-[10px] font-mono text-cyber-gray">FORENSIC QUEUE</span>
+              {/* Row 3: Recharts Analytics */}
+              {isMounted && incidents.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Incident Trends */}
+                  <div className="lg:col-span-2 p-5 border border-cyber-border bg-cyber-card/40 rounded flex flex-col h-80">
+                    <h3 className="font-mono text-xs font-bold text-white tracking-wider mb-4 uppercase flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-cyber-cyan" /> Incident Volume Trends (Last 6 Days)
+                    </h3>
+                    <div className="flex-1 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={trendsData}>
+                          <defs>
+                            <linearGradient id="colorIncidents" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#00f0ff" stopOpacity={0.25}/>
+                              <stop offset="95%" stopColor="#00f0ff" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                          <XAxis dataKey="date" stroke="#64748b" style={{ fontSize: 9, fontFamily: 'monospace' }} />
+                          <YAxis stroke="#64748b" style={{ fontSize: 9, fontFamily: 'monospace' }} allowDecimals={false} />
+                          <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', color: '#fff', fontSize: 10, fontFamily: 'monospace' }} />
+                          <Area type="monotone" dataKey="count" stroke="#00f0ff" fillOpacity={1} fill="url(#colorIncidents)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
 
-                  <div className="flex-1 overflow-x-auto">
-                    {incidents.length > 0 ? (
-                      <table className="w-full text-left border-collapse text-xs font-mono">
-                        <thead>
-                          <tr className="border-b border-cyber-border/60 text-cyber-gray uppercase text-[10px]">
-                            <th className="py-2.5">ID</th>
-                            <th className="py-2.5">Threat Profile</th>
-                            <th className="py-2.5">Severity</th>
-                            <th className="py-2.5">Status</th>
-                            <th className="py-2.5">Time Logged</th>
-                            <th className="py-2.5 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-cyber-border/40 text-slate-300">
-                          {incidents.slice(0, 5).map(inc => (
-                            <tr key={inc.id} className="hover:bg-cyber-card-light/30 transition-colors">
-                              <td className="py-3 font-bold text-cyber-cyan">{inc.id}</td>
-                              <td className="py-3 truncate max-w-[180px]" title={inc.title}>{inc.title}</td>
-                              <td className="py-3">{getSeverityBadge(inc.severity)}</td>
-                              <td className="py-3">{getStatusBadge(inc.status)}</td>
-                              <td className="py-3 text-[11px] text-cyber-gray">{inc.timestamp}</td>
-                              <td className="py-3 text-right">
-                                <button 
-                                  onClick={() => { setSelectedIncident(inc); setActiveView("detail"); }}
-                                  className="px-2 py-1 bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan rounded hover:bg-cyber-cyan/20 transition-all cursor-pointer"
-                                >
-                                  Investigate
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="text-center py-12 text-xs text-cyber-gray font-mono">
-                        No incidents stored. Click &quot;Load Demo Incident&quot; or analyze fresh logs.
+                  {/* Severity Distribution */}
+                  <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded flex flex-col h-80">
+                    <h3 className="font-mono text-xs font-bold text-white tracking-wider mb-4 uppercase flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 text-cyber-red" /> Severity Spread
+                    </h3>
+                    <div className="flex-1 w-full flex flex-col items-center justify-center">
+                      <div className="w-full h-36">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={severityData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={35}
+                              outerRadius={50}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {severityData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[entry.name] || '#64748b'} />
+                              ))}
+                            </Pie>
+                            <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', color: '#fff', fontSize: 10, fontFamily: 'monospace' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
-                    )}
+                      <div className="w-full grid grid-cols-2 gap-2 mt-4 font-mono text-[9px]">
+                        {severityData.map((entry) => (
+                          <div key={entry.name} className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: SEVERITY_COLORS[entry.name] }}></span>
+                            <span className="text-cyber-gray truncate">{entry.name}:</span>
+                            <span className="text-white font-bold">{entry.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
 
+                </div>
+              )}
+
+              {/* Row 4: Side-by-Side (Workloads & Threat Categories & Resolutions) */}
+              {isMounted && incidents.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Resolution Rates (BarChart) */}
+                  <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded flex flex-col h-80">
+                    <h3 className="font-mono text-xs font-bold text-white tracking-wider mb-4 uppercase flex items-center gap-1.5">
+                      <CheckCircle className="w-4 h-4 text-cyber-green" /> Resolution Efficiency
+                    </h3>
+                    <div className="flex-1 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={resolutionData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                          <XAxis dataKey="name" stroke="#64748b" style={{ fontSize: 9, fontFamily: 'monospace' }} />
+                          <YAxis stroke="#64748b" style={{ fontSize: 9, fontFamily: 'monospace' }} allowDecimals={false} />
+                          <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', color: '#fff', fontSize: 10, fontFamily: 'monospace' }} />
+                          <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]}>
+                            {resolutionData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.name === 'Resolved' ? '#10b981' : '#fb923c'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Workload distributions (BarChart) */}
+                  <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded flex flex-col h-80">
+                    <h3 className="font-mono text-xs font-bold text-white tracking-wider mb-4 uppercase flex items-center gap-1.5">
+                      <UserCheck className="w-4 h-4 text-cyber-cyan" /> Analyst Workloads
+                    </h3>
+                    <div className="flex-1 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={workloadData} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                          <XAxis type="number" stroke="#64748b" style={{ fontSize: 9, fontFamily: 'monospace' }} allowDecimals={false} />
+                          <YAxis dataKey="name" type="category" stroke="#64748b" style={{ fontSize: 9, fontFamily: 'monospace' }} width={80} />
+                          <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', color: '#fff', fontSize: 10, fontFamily: 'monospace' }} />
+                          <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Threat Categories (BarChart) */}
+                  <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded flex flex-col h-80">
+                    <h3 className="font-mono text-xs font-bold text-white tracking-wider mb-4 uppercase flex items-center gap-1.5">
+                      <Terminal className="w-4 h-4 text-cyber-cyan" /> Threat Categories
+                    </h3>
+                    <div className="flex-1 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={categoryData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                          <XAxis dataKey="name" stroke="#64748b" style={{ fontSize: 8, fontFamily: 'monospace' }} tickFormatter={(val) => val.split(' ')[0]} />
+                          <YAxis stroke="#64748b" style={{ fontSize: 9, fontFamily: 'monospace' }} allowDecimals={false} />
+                          <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', color: '#fff', fontSize: 9, fontFamily: 'monospace' }} />
+                          <Bar dataKey="count" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* Row 5: Audit Timeline Feed */}
+              <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded flex flex-col h-96">
+                <h3 className="font-mono text-xs font-bold text-white tracking-wider mb-2 uppercase flex items-center gap-1.5">
+                  <History className="w-4 h-4 text-cyber-cyan" /> Analyst Activity Timeline
+                </h3>
+                <p className="text-[10px] text-cyber-gray mb-4 font-mono">LIVE SOAR AUDIT LOG TRAIL</p>
+                
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-none">
+                  {auditLogs.length > 0 ? (
+                    auditLogs.map((log) => (
+                      <div key={log.id} className="p-3 bg-cyber-bg/40 border border-cyber-border/40 rounded flex items-start justify-between gap-3 text-[10px] font-mono hover:bg-cyber-card-light/10 transition-colors">
+                        <div className="space-y-1">
+                          <p className="text-slate-300 font-bold leading-relaxed">{log.action}</p>
+                          <div className="flex items-center gap-2 text-[8px]">
+                            <span className="text-cyber-cyan font-bold">{log.user_name}</span>
+                            <span className="text-cyber-gray">|</span>
+                            <span className="text-cyber-gray uppercase">{log.user_role}</span>
+                            {log.incident_id && (
+                              <>
+                                <span className="text-cyber-gray">|</span>
+                                <span className="text-cyber-red font-bold">{log.incident_id}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-cyber-gray text-[8px] flex-shrink-0 flex items-center gap-1 uppercase">
+                          <Clock className="w-3 h-3 text-cyber-cyan" />
+                          {new Date(log.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-16 text-xs text-cyber-gray font-mono">No activity logged in audit tables.</div>
+                  )}
+                </div>
               </div>
+
             </div>
           )}
 
@@ -1133,20 +1292,27 @@ export default function Home() {
                     <p className="text-xs text-cyber-gray mt-1">Upload raw network captures, server secure logs, database audit tables or auth logs for deep AI forensic analysis.</p>
                   </div>
 
+                  {currentUser?.role === "Viewer" && (
+                    <div className="p-3 border border-yellow-500/20 bg-yellow-500/10 rounded text-yellow-500 text-xs font-mono flex items-center gap-1.5">
+                      <Lock className="w-4 h-4" />
+                      <span>Viewer Role Locked: You can browse presets but cannot trigger live heuristics calculations.</span>
+                    </div>
+                  )}
+
                   {/* Preset quick buttons */}
                   <div className="bg-cyber-card/30 p-4 rounded border border-cyber-border/60">
                     <p className="text-[10px] font-mono text-cyber-gray tracking-wider uppercase mb-2">Simulate Specific Attack Logs (Demo Mode)</p>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => loadPreset("bruteForce")} className="px-3 py-1.5 bg-cyber-red/10 border border-cyber-red/30 text-cyber-red hover:bg-cyber-red/20 transition-all rounded text-xs font-mono">
+                      <button onClick={() => loadPreset("bruteForce")} className="px-3 py-1.5 bg-cyber-red/10 border border-cyber-red/30 text-cyber-red hover:bg-cyber-red/20 transition-all rounded text-xs font-mono cursor-pointer">
                         SSH Brute Force
                       </button>
-                      <button onClick={() => loadPreset("sqlInjection")} className="px-3 py-1.5 bg-cyber-amber/10 border border-cyber-amber/30 text-cyber-amber hover:bg-cyber-amber/20 transition-all rounded text-xs font-mono">
+                      <button onClick={() => loadPreset("sqlInjection")} className="px-3 py-1.5 bg-cyber-amber/10 border border-cyber-amber/30 text-cyber-amber hover:bg-cyber-amber/20 transition-all rounded text-xs font-mono cursor-pointer">
                         Web SQL Injection
                       </button>
-                      <button onClick={() => loadPreset("privilegeEscalation")} className="px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 transition-all rounded text-xs font-mono">
+                      <button onClick={() => loadPreset("privilegeEscalation")} className="px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 transition-all rounded text-xs font-mono cursor-pointer">
                         Linux privilege escalation
                       </button>
-                      <button onClick={() => loadPreset("suspiciousAuth")} className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/20 transition-all rounded text-xs font-mono">
+                      <button onClick={() => loadPreset("suspiciousAuth")} className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/20 transition-all rounded text-xs font-mono cursor-pointer">
                         Impossible Travel Auth
                       </button>
                     </div>
@@ -1171,14 +1337,15 @@ export default function Home() {
                         value={logsInput}
                         onChange={(e) => setLogsInput(e.target.value)}
                         placeholder={`# Paste raw text events here. Example:\n\nJun 15 14:20:01 auth-srv-01 sshd[12450]: Failed password for invalid user admin from 198.51.100.42 port 49218 ssh2...`}
+                        disabled={currentUser?.role === "Viewer"}
                         className="w-full h-96 p-4 rounded border border-cyber-border bg-cyber-bg text-cyber-cyan font-mono text-xs focus:outline-none focus:border-cyber-cyan focus:shadow-cyan-glow resize-y leading-relaxed"
                       ></textarea>
 
                       <button
                         onClick={runAnalysis}
-                        disabled={!logsInput.trim()}
+                        disabled={!logsInput.trim() || currentUser?.role === "Viewer"}
                         className={`w-full py-4 text-sm font-mono font-bold border rounded flex items-center justify-center gap-2 transition-all tracking-wider ${
-                          logsInput.trim() 
+                          logsInput.trim() && currentUser?.role !== "Viewer"
                             ? "bg-cyber-cyan text-cyber-bg border-cyber-cyan hover:shadow-cyan-glow hover:bg-transparent hover:text-cyber-cyan cursor-pointer"
                             : "bg-cyber-card border-cyber-border text-cyber-gray cursor-not-allowed"
                         }`}
@@ -1209,11 +1376,12 @@ export default function Home() {
                           <p className="text-[10px] text-cyber-gray">Supports .log, .txt, .json, .csv</p>
                         </div>
                         <span className="text-[10px] font-mono text-cyber-gray">-- OR --</span>
-                        <label className="px-4 py-2 border border-cyber-cyan/50 text-cyber-cyan hover:bg-cyber-cyan hover:text-cyber-bg rounded text-xs font-mono font-bold cursor-pointer transition-colors">
+                        <label className={`px-4 py-2 border border-cyber-cyan/50 text-cyber-cyan rounded text-xs font-mono font-bold cursor-pointer transition-colors ${currentUser?.role === 'Viewer' ? 'opacity-40 cursor-not-allowed' : 'hover:bg-cyber-cyan hover:text-cyber-bg'}`}>
                           BROWSE FILES
                           <input
                             type="file"
                             className="hidden"
+                            disabled={currentUser?.role === 'Viewer'}
                             onChange={handleFileChange}
                             accept=".txt,.log,.json,.csv"
                           />
@@ -1295,15 +1463,8 @@ export default function Home() {
                   <h2 className="text-2xl font-bold font-mono text-white tracking-wide flex items-center gap-2">
                     <History className="w-6 h-6 text-cyber-cyan" /> COMPROMISE DATABASE RECORDS
                   </h2>
-                  <p className="text-xs text-cyber-gray mt-1">Review, delete or reopen forensic cases in local storage.</p>
+                  <p className="text-xs text-cyber-gray mt-1">Review, delete or reopen persistent forensic cases in database.</p>
                 </div>
-                
-                <button 
-                  onClick={handleClearDatabase}
-                  className="flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-mono font-bold text-cyber-red border border-cyber-red/40 bg-cyber-red/5 rounded hover:bg-cyber-red/15 transition-all"
-                >
-                  <Trash2 className="w-4 h-4" /> FACTORY RESET DATABASE
-                </button>
               </div>
 
               {/* Incidents Table */}
@@ -1314,10 +1475,10 @@ export default function Home() {
                       <thead>
                         <tr className="border-b border-cyber-border/60 text-cyber-gray uppercase text-[10px]">
                           <th className="py-3 px-2">ID</th>
-                          <th className="py-3 px-2">Time Scanned</th>
                           <th className="py-3 px-2">Threat Vector Category</th>
                           <th className="py-3 px-2">Severity</th>
                           <th className="py-3 px-2">Status</th>
+                          <th className="py-3 px-2">Owner Analyst</th>
                           <th className="py-3 px-2">Intel Source</th>
                           <th className="py-3 px-2 text-right">Actions</th>
                         </tr>
@@ -1326,10 +1487,10 @@ export default function Home() {
                         {incidents.map(inc => (
                           <tr key={inc.id} className="hover:bg-cyber-card-light/30 transition-colors">
                             <td className="py-4 px-2 font-bold text-cyber-cyan">{inc.id}</td>
-                            <td className="py-4 px-2 text-cyber-gray">{inc.timestamp}</td>
                             <td className="py-4 px-2 font-bold max-w-[200px] truncate" title={inc.title}>{inc.title}</td>
                             <td className="py-4 px-2">{getSeverityBadge(inc.severity)}</td>
                             <td className="py-4 px-2">{getStatusBadge(inc.status)}</td>
+                            <td className="py-4 px-2 text-white">{inc.assigned_analyst || "Unassigned"}</td>
                             <td className="py-4 px-2 text-[10px] text-cyber-cyan">{inc.mocked ? "Local Simulation" : "OpenAI Backend"}</td>
                             <td className="py-4 px-2 text-right space-x-2">
                               <button 
@@ -1338,13 +1499,15 @@ export default function Home() {
                               >
                                 View Forensic
                               </button>
-                              <button 
-                                onClick={() => handleDeleteIncident(inc.id)}
-                                className="px-2 py-1 text-cyber-red/80 hover:text-cyber-red hover:bg-cyber-red/5 rounded transition-all cursor-pointer"
-                                title="Delete incident record"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 inline" />
-                              </button>
+                              {currentUser?.role === "Admin" && (
+                                <button 
+                                  onClick={() => handleDeleteRecord(inc.id)}
+                                  className="px-2 py-1 text-cyber-red/80 hover:text-cyber-red hover:bg-cyber-red/5 rounded transition-all cursor-pointer"
+                                  title="Delete record from database"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 inline" />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1356,7 +1519,7 @@ export default function Home() {
                     <p>Forensic database is clean. No active incident alerts cached.</p>
                     <button 
                       onClick={() => setActiveView("analyzer")}
-                      className="px-4 py-2 border border-cyber-cyan text-cyber-cyan hover:bg-cyber-cyan hover:text-cyber-bg text-xs font-mono font-bold rounded"
+                      className="px-4 py-2 border border-cyber-cyan text-cyber-cyan hover:bg-cyber-cyan hover:text-cyber-bg text-xs font-mono font-bold rounded cursor-pointer"
                     >
                       Analyze raw logs
                     </button>
@@ -1367,9 +1530,170 @@ export default function Home() {
             </div>
           )}
 
+          {/* VIEW: REPORT CENTER */}
+          {activeView === "reports" && (
+            <div className="space-y-6 animate-fadeIn">
+              
+              {/* Header */}
+              <div className="border-b border-cyber-border/40 pb-4">
+                <h2 className="text-2xl font-bold font-mono text-white tracking-wide flex items-center gap-2">
+                  <BookOpen className="w-6 h-6 text-cyber-cyan" /> REPORT CENTER
+                </h2>
+                <p className="text-xs text-cyber-gray mt-1">Search, sort, filter, and download compiled PDF security reports from database records.</p>
+              </div>
+
+              {/* Filter Panel */}
+              <div className="p-4 border border-cyber-border bg-cyber-card/30 rounded grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end text-xs font-mono">
+                
+                {/* Search */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-cyber-gray uppercase">Search Reports</label>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={reportSearch}
+                      onChange={(e) => setReportSearch(e.target.value)}
+                      placeholder="INC-2026 or Title..." 
+                      className="w-full p-2 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan focus:outline-none focus:border-cyber-cyan text-xs"
+                    />
+                    <Search className="w-3.5 h-3.5 text-cyber-gray absolute right-2 top-2.5" />
+                  </div>
+                </div>
+
+                {/* Severity */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-cyber-gray uppercase">Severity Filter</label>
+                  <select
+                    value={reportSeverityFilter}
+                    onChange={(e) => setReportSeverityFilter(e.target.value)}
+                    className="w-full p-2 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan text-xs"
+                  >
+                    <option value="ALL">ALL SEVERITIES</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="LOW">LOW</option>
+                  </select>
+                </div>
+
+                {/* Analyst */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-cyber-gray uppercase">Compiled Analyst</label>
+                  <select
+                    value={reportAnalystFilter}
+                    onChange={(e) => setReportAnalystFilter(e.target.value)}
+                    className="w-full p-2 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan text-xs"
+                  >
+                    <option value="ALL">ALL ANALYSTS</option>
+                    <option value="Devayani (Admin)">Devayani (Admin)</option>
+                    <option value="John Analyst">John Analyst</option>
+                    <option value="Sarah Viewer">Sarah Viewer</option>
+                  </select>
+                </div>
+
+                {/* Sort */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-cyber-gray uppercase">Sort Date</label>
+                  <select
+                    value={reportSort}
+                    onChange={(e) => setReportSort(e.target.value)}
+                    className="w-full p-2 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan text-xs"
+                  >
+                    <option value="desc">NEWEST COMPILED</option>
+                    <option value="asc">OLDEST COMPILED</option>
+                  </select>
+                </div>
+
+                {/* Clear */}
+                <button
+                  onClick={() => {
+                    setReportSearch("");
+                    setReportSeverityFilter("ALL");
+                    setReportAnalystFilter("ALL");
+                    setReportSort("desc");
+                  }}
+                  className="p-2 border border-cyber-border hover:bg-cyber-card-light/40 text-white rounded text-xs tracking-wider transition-all cursor-pointer text-center font-bold"
+                >
+                  RESET FILTERS
+                </button>
+
+              </div>
+
+              {/* Reports List */}
+              <div className="border border-cyber-border bg-cyber-card/40 rounded p-4">
+                {getFilteredReports().length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-cyber-border/60 text-cyber-gray uppercase text-[10px]">
+                          <th className="py-3 px-2">Report ID</th>
+                          <th className="py-3 px-2">Case ID</th>
+                          <th className="py-3 px-2">Report Title</th>
+                          <th className="py-3 px-2">Analyst</th>
+                          <th className="py-3 px-2">PDF Size</th>
+                          <th className="py-3 px-2">Date Generated</th>
+                          <th className="py-3 px-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-cyber-border/40 text-slate-300">
+                        {getFilteredReports().map(rep => {
+                          const matchingInc = incidents.find(inc => inc.id === rep.incident_id);
+                          return (
+                            <tr key={rep.id} className="hover:bg-cyber-card-light/30 transition-colors">
+                              <td className="py-4 px-2 text-cyber-gray">{rep.id}</td>
+                              <td className="py-4 px-2 font-bold text-cyber-cyan">{rep.incident_id}</td>
+                              <td className="py-4 px-2 font-bold">{rep.name}</td>
+                              <td className="py-4 px-2 text-white">{rep.generated_by || "System"}</td>
+                              <td className="py-4 px-2 text-cyber-gray">{Math.round((rep.pdf_size_bytes || 45000) / 1024)} KB</td>
+                              <td className="py-4 px-2 text-cyber-gray">{new Date(rep.created_at).toLocaleDateString()} {new Date(rep.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</td>
+                              <td className="py-4 px-2 text-right space-x-2">
+                                <button
+                                  onClick={() => {
+                                    if (matchingInc) {
+                                      setSelectedIncident(matchingInc);
+                                      setActiveView("detail");
+                                    } else {
+                                      triggerToast("Original case logs missing.", "error");
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-cyber-cyan/15 border border-cyber-cyan/30 text-cyber-cyan rounded hover:bg-cyber-cyan/30 text-[10px] transition-all cursor-pointer font-bold"
+                                >
+                                  Inspect Case
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (matchingInc) {
+                                      handleDownloadPDF(matchingInc);
+                                    } else {
+                                      triggerToast("Original case logs missing.", "error");
+                                    }
+                                  }}
+                                  className="px-2 py-1 border border-cyber-green/40 bg-cyber-green/5 text-cyber-green hover:bg-cyber-green/20 rounded text-[10px] transition-all cursor-pointer font-bold"
+                                  title="Download PDF report copy"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-20 text-xs text-cyber-gray font-mono">
+                    No compiled report logs match the active filter criteria.
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+
           {/* VIEW: SPLUNK MCP BRIDGE */}
           {activeView === "splunk-mcp" && (
             <div className="space-y-6 animate-fadeIn max-w-4xl">
+              
               <div className="border-b border-cyber-border/40 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold font-mono text-white tracking-wide flex items-center gap-2">
@@ -1392,87 +1716,167 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* HEC Placeholder Configuration & Verification */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Connection Parameters Form (7 cols) */}
-                <form onSubmit={(e) => { e.preventDefault(); testMcpConnection(); }} className="lg:col-span-7 p-6 border border-cyber-border bg-cyber-card/40 rounded space-y-4">
-                  <h3 className="text-sm font-mono font-bold text-white tracking-wider border-b border-cyber-border/40 pb-2">
-                    MCP Bridge Parameters
+                
+                {/* HEC Config Form (7 cols) */}
+                <div className="lg:col-span-7 p-6 border border-cyber-border bg-cyber-card/40 rounded space-y-4">
+                  
+                  <h3 className="text-sm font-mono font-bold text-white tracking-wider border-b border-cyber-border/40 pb-2 flex items-center justify-between">
+                    <span>Splunk HTTP Event Collector (HEC) Setup</span>
+                    <span className="text-[9px] text-cyber-gray uppercase">Architecture Template</span>
                   </h3>
 
                   <div className="space-y-2 font-mono text-xs">
-                    <label className="text-white font-bold block">Splunk Enterprise Host URL</label>
+                    <label className="text-white font-bold block">Splunk HEC Ingestion Endpoint</label>
                     <input
                       type="text"
-                      value={splunkHost}
-                      onChange={(e) => setSplunkHost(e.target.value)}
-                      placeholder="https://splunk-prod.corp.local:8089"
-                      className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan font-mono text-xs focus:outline-none focus:border-cyber-cyan"
+                      value="https://splunk-hec.corp.local:8088/services/collector/event"
+                      disabled
+                      className="w-full p-2.5 bg-cyber-bg border border-cyber-border/50 rounded text-cyber-gray/70 font-mono text-xs focus:outline-none"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 font-mono text-xs">
-                      <label className="text-white font-bold block">Auth Token (Bearer)</label>
+                      <label className="text-white font-bold block">HEC Token ID</label>
                       <input
                         type="password"
-                        value={splunkToken}
-                        onChange={(e) => setSplunkToken(e.target.value)}
+                        value={hecToken}
+                        onChange={(e) => setHecToken(e.target.value)}
                         className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan font-mono text-xs focus:outline-none focus:border-cyber-cyan"
                       />
                     </div>
+                    
                     <div className="space-y-2 font-mono text-xs">
-                      <label className="text-white font-bold block">Target Security Index</label>
+                      <label className="text-white font-bold block">Telemetry Source Type</label>
                       <input
                         type="text"
-                        value={splunkIndex}
-                        onChange={(e) => setSplunkIndex(e.target.value)}
-                        placeholder="security"
-                        className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan font-mono text-xs focus:outline-none focus:border-cyber-cyan"
+                        value="json_syslog"
+                        disabled
+                        className="w-full p-2.5 bg-cyber-bg border border-cyber-border/50 rounded text-cyber-gray/70 font-mono text-xs"
                       />
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={mcpStatus === "testing"}
-                    className={`w-full py-3 text-xs font-mono font-bold border rounded transition-all tracking-wider flex items-center justify-center gap-2 cursor-pointer ${
-                      mcpStatus === "testing"
-                        ? "bg-cyber-card border-cyber-border text-cyber-gray cursor-not-allowed"
-                        : "bg-cyber-cyan text-cyber-bg border-cyber-cyan hover:shadow-cyan-glow hover:bg-transparent hover:text-cyber-cyan"
-                    }`}
-                  >
-                    {mcpStatus === "testing" ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin animate-pulse" />
-                        <span>VERIFYING CONNECTION SCHEMA...</span>
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>TEST SPLUNK MCP CONNECTION</span>
-                      </>
-                    )}
-                  </button>
-                </form>
+                  <div className="p-3 border border-cyber-border bg-cyber-bg/40 rounded flex items-center justify-between">
+                    <div className="space-y-1 font-mono text-xs pr-4">
+                      <span className="text-white font-bold block">Real-Time Log Ingestion Stream</span>
+                      <span className="text-[10px] text-cyber-gray leading-relaxed">Establish active telemetry socket listener hooks.</span>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setHecEnabled(!hecEnabled);
+                        triggerToast(hecEnabled ? "HEC Streaming Disabled" : "HEC Real-time Streaming Active", "success");
+                        logSOCActivity(`${currentUser?.full_name} toggled HEC Ingestion Streaming to ${!hecEnabled}`);
+                      }}
+                      className={`px-3 py-1.5 border rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                        hecEnabled 
+                          ? "bg-cyber-green/10 border-cyber-green/50 text-cyber-green shadow-green-glow" 
+                          : "bg-cyber-card border-cyber-border text-slate-400"
+                      }`}
+                    >
+                      {hecEnabled ? "ACTIVE STREAM" : "ACTIVATE"}
+                    </button>
+                  </div>
+
+                  {/* Connect Parameters Form (7 cols) */}
+                  <form onSubmit={(e) => { e.preventDefault(); testMcpConnection(); }} className="space-y-4 pt-4 border-t border-cyber-border/40">
+                    <h3 className="text-sm font-mono font-bold text-white tracking-wider border-b border-cyber-border/40 pb-2">
+                      Splunk Daemon MCP Bridge parameters
+                    </h3>
+
+                    <div className="space-y-2 font-mono text-xs">
+                      <label className="text-white font-bold block">Splunk REST Host URL (Port 8089)</label>
+                      <input
+                        type="text"
+                        value={splunkHost}
+                        onChange={(e) => setSplunkHost(e.target.value)}
+                        placeholder="https://splunk-prod.corp.local:8089"
+                        className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan font-mono text-xs focus:outline-none focus:border-cyber-cyan"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 font-mono text-xs">
+                        <label className="text-white font-bold block">Auth Token (Bearer)</label>
+                        <input
+                          type="password"
+                          value={splunkToken}
+                          onChange={(e) => setSplunkToken(e.target.value)}
+                          className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan font-mono text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2 font-mono text-xs">
+                        <label className="text-white font-bold block">Target Security Index</label>
+                        <input
+                          type="text"
+                          value={splunkIndex}
+                          onChange={(e) => setSplunkIndex(e.target.value)}
+                          placeholder="security"
+                          className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan font-mono text-xs focus:outline-none focus:border-cyber-cyan"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={mcpStatus === "testing"}
+                      className={`w-full py-3 text-xs font-mono font-bold border rounded transition-all tracking-wider flex items-center justify-center gap-2 cursor-pointer ${
+                        mcpStatus === "testing"
+                          ? "bg-cyber-card border-cyber-border text-cyber-gray cursor-not-allowed"
+                          : "bg-cyber-cyan text-cyber-bg border-cyber-cyan hover:shadow-cyan-glow hover:bg-transparent hover:text-cyber-cyan"
+                      }`}
+                    >
+                      {mcpStatus === "testing" ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin animate-pulse" />
+                          <span>VERIFYING CONNECTION SCHEMA...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>TEST SPLUNK MCP CONNECTION</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                </div>
 
                 {/* Console Log Logins (5 cols) */}
-                <div className="lg:col-span-5 border border-cyber-border bg-black/80 rounded p-4 h-64 overflow-y-auto text-[10px] text-cyber-green font-mono leading-relaxed space-y-1 relative shadow-inner">
-                  <div className="absolute top-2 right-2 text-cyber-cyan font-bold text-[8px] border border-cyber-cyan/35 px-1 py-0.5 rounded tracking-widest bg-cyber-cyan/10 uppercase animate-pulse">
-                    MCP Bridge Console
-                  </div>
-                  {mcpLogs.length === 0 ? (
-                    <div className="text-cyber-gray h-full flex flex-col justify-center items-center text-center">
-                      <Terminal className="w-8 h-8 text-cyber-border mb-2" />
-                      <span>Console idle. Click test to establish WebSocket.</span>
+                <div className="lg:col-span-5 flex flex-col gap-4">
+                  <div className="flex-1 border border-cyber-border bg-black/80 rounded p-4 h-64 overflow-y-auto text-[10px] text-cyber-green font-mono leading-relaxed space-y-1 relative shadow-inner">
+                    <div className="absolute top-2 right-2 text-cyber-cyan font-bold text-[8px] border border-cyber-cyan/35 px-1 py-0.5 rounded tracking-widest bg-cyber-cyan/10 uppercase animate-pulse">
+                      MCP Bridge Console
                     </div>
-                  ) : (
-                    mcpLogs.map((log, idx) => (
-                      <div key={idx} className={log.includes("Success") || log.includes("READY") ? "text-cyber-cyan" : ""}>
-                        {log}
+                    {mcpLogs.length === 0 ? (
+                      <div className="text-cyber-gray h-full flex flex-col justify-center items-center text-center">
+                        <Terminal className="w-8 h-8 text-cyber-border mb-2" />
+                        <span>Console idle. Click test to establish WebSocket.</span>
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      mcpLogs.map((log, idx) => (
+                        <div key={idx} className={log.includes("Success") || log.includes("READY") ? "text-cyber-cyan" : ""}>
+                          {log}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Architecture Ready block */}
+                  <div className="p-4 border border-cyber-cyan/20 bg-cyber-cyan/5 rounded text-xs font-mono leading-relaxed text-slate-400 space-y-2">
+                    <div className="flex items-center gap-2 text-white font-bold">
+                      <Network className="w-4 h-4 text-cyber-cyan" />
+                      <span>HEC Ingestion Pipeline Flow</span>
+                    </div>
+                    <p className="text-[10px]">
+                      The HTTP Event Collector (HEC) allows secure telemetry forwarding from remote Splunk indexer systems to Splunk Sentinel endpoints. Active tokens route raw payload logs directly to `/api/analyze` serverless functions for autonomous incident classification and containment mapping.
+                    </p>
+                  </div>
                 </div>
+
               </div>
 
               {/* Splunk Real-time Ingestion & Integration Roadmap */}
@@ -1534,6 +1938,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
             </div>
           )}
 
@@ -1546,6 +1951,13 @@ export default function Home() {
                 </h2>
                 <p className="text-xs text-cyber-gray mt-1">Configure artificial intelligence backends, models, credentials and database operations.</p>
               </div>
+
+              {currentUser?.role === "Viewer" && (
+                <div className="p-3 border border-yellow-500/20 bg-yellow-500/10 rounded text-yellow-500 text-xs font-mono flex items-center gap-1.5">
+                  <Lock className="w-4 h-4" />
+                  <span>Viewer Role Locked: Settings configuration updates restricted.</span>
+                </div>
+              )}
 
               <form onSubmit={handleSaveSettings} className="p-6 border border-cyber-border bg-cyber-card/40 rounded space-y-6">
                 
@@ -1561,10 +1973,11 @@ export default function Home() {
                     type="password"
                     value={openaiKey}
                     onChange={(e) => setOpenaiKey(e.target.value)}
+                    disabled={currentUser?.role === "Viewer"}
                     placeholder="sk-proj-........................................"
                     className="w-full p-3 bg-cyber-bg border border-cyber-border rounded text-xs text-cyber-cyan font-mono focus:outline-none focus:border-cyber-cyan focus:shadow-cyan-glow"
                   />
-                  {openaiKey && (
+                  {openaiKey && currentUser?.role !== "Viewer" && (
                     <button 
                       type="button" 
                       onClick={() => { setOpenaiKey(""); localStorage.removeItem("sentinel_openai_key"); triggerToast("Custom key cleared", "success"); }} 
@@ -1583,6 +1996,7 @@ export default function Home() {
                   <select
                     value={selectedModel}
                     onChange={(e) => setSelectedModel(e.target.value)}
+                    disabled={currentUser?.role === "Viewer"}
                     className="w-full p-3 bg-cyber-bg border border-cyber-border rounded text-xs text-cyber-cyan font-mono focus:outline-none focus:border-cyber-cyan"
                   >
                     <option value="gpt-4o-mini">gpt-4o-mini (Recommended - Fast & Cost-Effective)</option>
@@ -1593,32 +2007,18 @@ export default function Home() {
                 <div className="flex gap-4 pt-2">
                   <button 
                     type="submit"
-                    className="px-6 py-2.5 bg-cyber-cyan text-cyber-bg border border-cyber-cyan font-mono font-bold text-xs rounded hover:bg-transparent hover:text-cyber-cyan hover:shadow-cyan-glow transition-all cursor-pointer"
+                    disabled={currentUser?.role === "Viewer"}
+                    className={`px-6 py-2.5 font-mono font-bold text-xs rounded border transition-all ${
+                      currentUser?.role === "Viewer"
+                        ? "bg-cyber-card border-cyber-border text-cyber-gray cursor-not-allowed"
+                        : "bg-cyber-cyan text-cyber-bg border-cyber-cyan hover:bg-transparent hover:text-cyber-cyan hover:shadow-cyan-glow cursor-pointer"
+                    }`}
                   >
                     SAVE CONFIGURATION
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={handleClearDatabase}
-                    className="px-6 py-2.5 text-cyber-red border border-cyber-red/30 bg-cyber-red/5 rounded hover:bg-cyber-red/15 transition-all text-xs font-mono cursor-pointer"
-                  >
-                    RESET DATABASE TO DEFAULTS
                   </button>
                 </div>
 
               </form>
-
-              {/* Informational SOC Banner */}
-              <div className="p-4 border border-cyber-cyan/20 bg-cyber-cyan/5 rounded text-xs font-mono leading-relaxed text-slate-400 space-y-2">
-                <div className="flex items-center gap-2 text-white font-bold">
-                  <Info className="w-4 h-4 text-cyber-cyan" />
-                  <span>Local Mock Mode Enabled by Default</span>
-                </div>
-                <p>
-                  If no API key override is set in this settings block, and no `OPENAI_API_KEY` exists in the server environment variables, Splunk Sentinel will function in local simulation mode. This allows quick inspection of core timelines, dashboards, PDF downloads, and chatbot actions without requiring live API credits.
-                </p>
-              </div>
 
             </div>
           )}
@@ -1640,47 +2040,61 @@ export default function Home() {
                     <h2 className="text-xl font-bold font-mono text-white tracking-wide">
                       FORENSICS: <span className="text-cyber-cyan">{selectedIncident.id}</span>
                     </h2>
-                    <p className="text-[10px] font-mono text-cyber-gray">SCANNED AT: {selectedIncident.timestamp} | CORE ENGINE: {selectedIncident.modelUsed || "Sentinel"}</p>
+                    <p className="text-[10px] font-mono text-cyber-gray">SCANNED AT: {selectedIncident.created_at || selectedIncident.timestamp} | CORE ENGINE: {selectedIncident.modelUsed || "Sentinel"}</p>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  
+                  {/* Status Dropdown */}
+                  <div className="flex items-center gap-1.5 border border-cyber-border rounded px-2.5 py-1.5 bg-cyber-card">
+                    <span className="text-cyber-gray text-[9px] uppercase font-bold">STATUS:</span>
+                    <select
+                      value={selectedIncident.status}
+                      disabled={currentUser?.role === "Viewer"}
+                      onChange={(e) => handleUpdateStatus(e.target.value)}
+                      className="bg-transparent text-white focus:outline-none text-xs font-mono uppercase font-bold"
+                    >
+                      <option value="Open">Open</option>
+                      <option value="Investigating">Investigating</option>
+                      <option value="Contained">Contained</option>
+                      <option value="Resolved">Resolved</option>
+                    </select>
+                  </div>
+
+                  {/* Owner Dropdown */}
+                  <div className="flex items-center gap-1.5 border border-cyber-border rounded px-2.5 py-1.5 bg-cyber-card">
+                    <span className="text-cyber-gray text-[9px] uppercase font-bold">OWNER:</span>
+                    <select
+                      value={selectedIncident.assigned_analyst || "Unassigned"}
+                      disabled={currentUser?.role === "Viewer"}
+                      onChange={(e) => handleUpdateAssignment(e.target.value)}
+                      className="bg-transparent text-white focus:outline-none text-xs font-mono"
+                    >
+                      <option value="Unassigned">Unassigned</option>
+                      <option value="Devayani (Admin)">Devayani (Admin)</option>
+                      <option value="John Analyst">John Analyst</option>
+                      <option value="Sarah Viewer">Sarah Viewer</option>
+                    </select>
+                  </div>
+
                   <button 
                     onClick={() => handleDownloadPDF(selectedIncident)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan rounded hover:bg-cyber-cyan/25 hover:shadow-cyan-glow transition-all text-xs font-mono cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan rounded hover:bg-cyber-cyan/25 hover:shadow-cyan-glow transition-all text-xs font-mono cursor-pointer font-bold"
                   >
                     <Download className="w-3.5 h-3.5" /> EXPORT PDF REPORT
                   </button>
 
-                  <div className="flex border border-cyber-border rounded overflow-hidden">
+                  {currentUser?.role === "Admin" && (
                     <button 
-                      onClick={() => handleUpdateStatus("Triage")} 
-                      className={`px-3 py-1.5 text-xs font-mono transition-colors ${selectedIncident.status === "Triage" ? "bg-cyber-gray/20 text-white font-bold border-r border-cyber-border" : "text-cyber-gray hover:bg-cyber-card-light border-r border-cyber-border"}`}
+                      onClick={() => handleDeleteRecord(selectedIncident.id)}
+                      className="p-1.5 border border-cyber-red/30 bg-cyber-red/5 hover:bg-cyber-red/15 text-cyber-red rounded transition-all cursor-pointer"
+                      title="Delete record from database"
                     >
-                      Triage
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                    <button 
-                      onClick={() => handleUpdateStatus("Investigating")} 
-                      className={`px-3 py-1.5 text-xs font-mono transition-colors ${selectedIncident.status === "Investigating" ? "bg-cyber-cyan/20 text-cyber-cyan font-bold border-r border-cyber-border" : "text-cyber-gray hover:bg-cyber-card-light border-r border-cyber-border animate-pulse"}`}
-                    >
-                      Investigating
-                    </button>
-                    <button 
-                      onClick={() => handleUpdateStatus("Resolved")} 
-                      className={`px-3 py-1.5 text-xs font-mono transition-colors ${selectedIncident.status === "Resolved" ? "bg-cyber-green/20 text-cyber-green font-bold" : "text-cyber-gray hover:bg-cyber-card-light"}`}
-                    >
-                      Resolved
-                    </button>
-                  </div>
-
-                  <button 
-                    onClick={() => handleDeleteIncident(selectedIncident.id)}
-                    className="p-1.5 border border-cyber-red/30 bg-cyber-red/5 hover:bg-cyber-red/15 text-cyber-red rounded transition-all cursor-pointer"
-                    title="Delete record from system"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  )}
                 </div>
               </div>
 
@@ -1766,7 +2180,7 @@ export default function Home() {
 
                       <div className="p-3 bg-cyber-bg/60 rounded border border-cyber-border/80 space-y-1.5">
                         <span className="text-[10px] font-mono text-yellow-500 uppercase font-bold flex items-center gap-1">
-                          <User className="w-3 h-3" /> Compromised Accounts
+                          <User className="w-3 h-3" /> Targeted Accounts
                         </span>
                         <div className="flex flex-wrap gap-1">
                           {selectedIncident.keyArtifacts?.affectedUsers?.length > 0 ? (
@@ -1780,13 +2194,13 @@ export default function Home() {
                       </div>
 
                       <div className="p-3 bg-cyber-bg/60 rounded border border-cyber-border/80 space-y-1.5">
-                        <span className="text-[10px] font-mono text-cyber-green uppercase font-bold flex items-center gap-1">
-                          <Lock className="w-3 h-3" /> Signature Flags
+                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold flex items-center gap-1">
+                          <Terminal className="w-3 h-3" /> Heuristic Signatures
                         </span>
                         <div className="flex flex-wrap gap-1">
                           {selectedIncident.keyArtifacts?.signatures?.length > 0 ? (
                             selectedIncident.keyArtifacts.signatures.map(sig => (
-                              <span key={sig} className="px-2 py-0.5 bg-black/40 border border-cyber-border rounded font-mono text-[10px] text-white truncate max-w-full" title={sig}>{sig}</span>
+                              <span key={sig} className="px-2 py-0.5 bg-black/40 border border-cyber-border rounded font-mono text-[9px] text-white truncate max-w-[170px]" title={sig}>{sig}</span>
                             ))
                           ) : (
                             <span className="text-cyber-gray font-mono text-[10px]">None parsed</span>
@@ -1797,200 +2211,206 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Incident Chronological Timeline */}
-                  <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded space-y-4">
+                  {/* Incident Timeline */}
+                  <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded space-y-3">
                     <h3 className="font-mono text-xs font-bold text-white tracking-wider border-b border-cyber-border/40 pb-2 flex items-center gap-1.5">
-                      <History className="w-3.5 h-3.5 text-cyber-cyan" /> 4. INCIDENT TIMELINE CORRELATION
+                      <Clock className="w-3.5 h-3.5 text-cyber-cyan" /> 4. INCIDENT TIMELINE CORRELATION
                     </h3>
                     
-                    <div className="relative border-l border-cyber-border/80 pl-6 ml-2 space-y-6">
+                    <div className="relative border-l border-cyber-border/80 ml-3 space-y-6 py-2">
                       {selectedIncident.timeline && selectedIncident.timeline.length > 0 ? (
                         selectedIncident.timeline.map((event, idx) => (
-                          <div key={idx} className="relative">
-                            {/* Bullet dot */}
-                            <span className="absolute -left-[31px] top-1.5 w-3 h-3 rounded-full bg-cyber-bg border border-cyber-cyan flex items-center justify-center">
-                              <span className="w-1.5 h-1.5 rounded-full bg-cyber-cyan"></span>
-                            </span>
-                            
-                            <div className="space-y-1 font-mono">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-bold text-cyber-cyan bg-cyber-cyan/10 px-1.5 py-0.5 rounded border border-cyber-cyan/25">{event.time}</span>
-                                <span className="text-xs text-white font-bold">{event.event}</span>
-                              </div>
-                              <p className="text-[11px] text-slate-400">{event.details}</p>
+                          <div key={idx} className="relative pl-6">
+                            <span className="absolute -left-1.5 top-1 w-3 h-3 rounded-full bg-cyber-cyan border border-cyber-bg shadow-cyan-glow"></span>
+                            <div className="flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 bg-cyber-cyan/15 border border-cyber-cyan/30 text-cyber-cyan text-[8px] font-bold rounded font-mono">
+                                {event.time}
+                              </span>
+                              <span className="text-white font-bold text-xs">{event.event}</span>
                             </div>
+                            <p className="text-[10px] text-cyber-gray mt-1 leading-relaxed">{event.details}</p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-cyber-gray font-mono pl-2">No timeline parsed.</p>
+                        <div className="pl-6 text-xs text-cyber-gray">No chronological logs timeline mapped.</div>
                       )}
                     </div>
                   </div>
 
-                  {/* Containment Roadmap Checklist */}
+                  {/* Remediation & Containment */}
                   <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded space-y-4">
+                    
+                    {/* Resolution Progress */}
                     <div className="flex items-center justify-between border-b border-cyber-border/40 pb-2">
                       <h3 className="font-mono text-xs font-bold text-white tracking-wider flex items-center gap-1.5">
-                        <CheckCircle className="w-3.5 h-3.5 text-cyber-cyan" /> 5. REMEDIATION & CONTAINMENT ROADMAP
+                        <CheckCircle className="w-3.5 h-3.5 text-cyber-green" /> 5. REMEDIATION & CONTAINMENT ROADMAP
                       </h3>
                       
-                      {/* Completion rate math */}
-                      <span className="text-xs font-mono font-bold text-cyber-cyan">
-                        {selectedIncident.recommendedActions?.length 
-                          ? Math.round(((selectedIncident.completedActions?.length || 0) / selectedIncident.recommendedActions.length) * 100) 
-                          : 0}% Resolved
-                      </span>
-                    </div>
-
-                    {/* Progress slider bar */}
-                    <div className="w-full bg-cyber-bg h-1 rounded overflow-hidden">
-                      <div 
-                        className="bg-cyber-cyan h-full rounded shadow-cyan-glow transition-all"
-                        style={{ 
-                          width: `${selectedIncident.recommendedActions?.length 
-                            ? ((selectedIncident.completedActions?.length || 0) / selectedIncident.recommendedActions.length) * 100 
-                            : 0}%` 
-                        }}
-                      ></div>
+                      {(() => {
+                        const total = selectedIncident.recommendedActions?.length || 0;
+                        const completed = selectedIncident.completedActions?.length || 0;
+                        const pct = total ? Math.round((completed / total) * 100) : 0;
+                        return (
+                          <span className={`text-xs font-bold font-mono ${pct === 100 ? "text-cyber-green" : "text-cyber-cyan"}`}>
+                            {pct}% Resolved
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="space-y-2">
                       {selectedIncident.recommendedActions && selectedIncident.recommendedActions.length > 0 ? (
                         selectedIncident.recommendedActions.map((action, idx) => {
-                          const isDone = selectedIncident.completedActions?.includes(action);
+                          const isCompleted = selectedIncident.completedActions?.includes(action);
                           return (
                             <div 
-                              key={idx} 
+                              key={idx}
                               onClick={() => handleToggleAction(action)}
-                              className={`flex items-start gap-3 p-2.5 rounded border font-mono text-xs cursor-pointer transition-all ${
-                                isDone 
-                                  ? "bg-cyber-green/5 border-cyber-green/30 text-slate-400 line-through" 
-                                  : "bg-cyber-bg border-cyber-border/80 text-white hover:border-cyber-cyan/50 hover:bg-cyber-card-light/20"
+                              className={`p-3 border rounded text-xs font-mono cursor-pointer transition-all flex items-start gap-3 ${
+                                isCompleted 
+                                  ? "border-cyber-green/45 bg-cyber-green/5 text-cyber-green/80" 
+                                  : "border-cyber-border bg-cyber-bg hover:border-cyber-cyan/60 text-slate-300"
                               }`}
                             >
-                              <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center ${isDone ? "border-cyber-green bg-cyber-green/25 text-cyber-green" : "border-cyber-cyan/50"}`}>
-                                {isDone && <CheckCircle className="w-3 h-3" />}
-                              </div>
-                              <span className="flex-1">{action}</span>
+                              <span className={`w-4 h-4 border rounded flex items-center justify-center flex-shrink-0 ${isCompleted ? "border-cyber-green text-cyber-green bg-cyber-green/20" : "border-cyber-gray"}`}>
+                                {isCompleted && "✓"}
+                              </span>
+                              <p className="leading-relaxed">{action}</p>
                             </div>
                           );
                         })
                       ) : (
-                        <p className="text-xs text-cyber-gray font-mono">No recommended actions logged.</p>
+                        <div className="text-center py-6 text-xs text-cyber-gray font-mono">No containment rules generated.</div>
                       )}
                     </div>
                   </div>
 
-                  {/* Raw Log payload review section */}
+                  {/* Raw Logs Area */}
                   <div className="p-5 border border-cyber-border bg-cyber-card/40 rounded space-y-3">
                     <h3 className="font-mono text-xs font-bold text-white tracking-wider border-b border-cyber-border/40 pb-2">
                       RAW SCAN RECORDED LOG PAYLOAD
                     </h3>
-                    <pre className="p-4 bg-black/60 rounded border border-cyber-border text-[10px] text-cyan-500/80 font-mono overflow-x-auto max-h-60 leading-relaxed">
-                      {selectedIncident.logs}
+                    <pre className="p-4 rounded border border-cyber-border bg-black/60 text-[10px] text-cyber-cyan overflow-x-auto leading-relaxed max-h-60 overflow-y-auto scrollbar-none font-mono">
+                      {selectedIncident.logs || "No raw logs captured."}
                     </pre>
                   </div>
 
                 </div>
 
-                {/* RIGHT: Sentinel AI Chat panel (5 cols) */}
-                <div className="lg:col-span-5 border border-cyber-border bg-cyber-card/60 rounded flex flex-col h-[650px] sticky top-6 shadow-sm overflow-hidden">
+                {/* RIGHT: Sentinel AI Copilot V2 (5 cols) */}
+                <div className="lg:col-span-5 p-5 border border-cyber-border bg-cyber-card/65 rounded flex flex-col h-[600px] relative">
                   
-                  {/* Chat header */}
-                  <div className="p-4 bg-cyber-bg/85 border-b border-cyber-border flex items-center justify-between font-mono">
+                  {/* Title */}
+                  <div className="border-b border-cyber-border/40 pb-3 flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-cyber-cyan animate-pulse"></div>
-                      <span className="text-xs font-bold text-white tracking-wider uppercase">SENTINEL CHAT COPROCESSOR</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-cyber-cyan animate-pulse"></span>
+                      <h3 className="font-mono text-xs font-bold text-white tracking-wider">SENTINEL CHAT COPROCESSOR V2</h3>
                     </div>
-                    <span className="text-[9px] text-cyber-gray font-mono">ENGINE: {openaiKey ? "OPENAI ANALYSIS" : "MOCK ENGINE"}</span>
+                    <span className="text-[8px] font-mono text-cyber-cyan border border-cyber-cyan/40 px-1 bg-cyber-cyan/10">ACTIVE CONTEXT</span>
                   </div>
 
-                  {/* Prompt Quick Buttons */}
-                  <div className="px-4 py-2 border-b border-cyber-border/40 bg-cyber-bg/40 flex gap-1.5 overflow-x-auto text-[9px] font-mono no-print">
-                    <button 
-                      onClick={() => setChatInput("Summarize all IP addresses in these logs.")}
-                      className="px-2 py-1 bg-cyber-card border border-cyber-border text-slate-300 rounded hover:border-cyber-cyan/60 hover:text-cyber-cyan truncate whitespace-nowrap cursor-pointer"
-                    >
-                      Summarize IPs
-                    </button>
-                    <button 
-                      onClick={() => setChatInput("Suggest specific command-line block rules.")}
-                      className="px-2 py-1 bg-cyber-card border border-cyber-border text-slate-300 rounded hover:border-cyber-cyan/60 hover:text-cyber-cyan truncate whitespace-nowrap cursor-pointer"
-                    >
-                      Suggest Block Rules
-                    </button>
-                    <button 
-                      onClick={() => setChatInput("Explain the privilege escalation vector.")}
-                      className="px-2 py-1 bg-cyber-card border border-cyber-border text-slate-300 rounded hover:border-cyber-cyan/60 hover:text-cyber-cyan truncate whitespace-nowrap cursor-pointer"
-                    >
-                      Escalation Vector
-                    </button>
-                  </div>
-
-                  {/* Dialogue screen */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs">
-                    
-                    {selectedIncident.chatHistory?.map((msg, idx) => (
-                      <div 
-                        key={idx}
-                        className={`flex gap-3 max-w-[85%] ${msg.role === "user" ? "ml-auto flex-row-reverse" : ""}`}
-                      >
-                        {/* Avatar */}
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border text-[10px] ${
-                          msg.role === "user" 
-                            ? "bg-cyber-cyan/10 border-cyber-cyan text-cyber-cyan" 
-                            : "bg-cyber-card border-cyber-border text-white shadow-cyan-glow"
+                  {/* Chat bubbles list */}
+                  <div className="flex-1 overflow-y-auto space-y-4 pr-1 mb-4 scrollbar-none">
+                    {(selectedIncident.chatHistory || []).map((msg, idx) => (
+                      <div key={idx} className={`flex items-start gap-2.5 text-xs font-mono ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        {msg.role !== 'user' && (
+                          <div className="w-6 h-6 rounded-full border border-cyber-cyan/40 bg-cyber-cyan/5 flex items-center justify-center text-cyber-cyan text-[10px] font-bold flex-shrink-0">
+                            SE
+                          </div>
+                        )}
+                        <div className={`p-3 rounded max-w-[85%] leading-relaxed whitespace-pre-wrap relative ${
+                          msg.role === 'user'
+                            ? 'bg-cyber-cyan/10 border border-cyber-cyan/35 text-slate-200'
+                            : 'bg-cyber-card border border-cyber-border text-slate-300'
                         }`}>
-                          {msg.role === "user" ? "US" : "SE"}
-                        </div>
-
-                        {/* Content bubble */}
-                        <div className={`p-3 rounded leading-relaxed border ${
-                          msg.role === "user"
-                            ? "bg-cyber-cyan/5 border-cyber-cyan/20 text-cyber-cyan"
-                            : "bg-cyber-card-light/50 border-cyber-border/80 text-slate-200"
-                        }`}>
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                          <span className="text-[8px] text-cyber-gray block text-right mt-1.5">{msg.timestamp}</span>
+                          <p>{msg.content}</p>
+                          <span className="text-[7px] text-cyber-gray block text-right mt-1.5 uppercase tracking-wider">{msg.timestamp}</span>
                         </div>
                       </div>
                     ))}
-
-                    {/* Loader typing */}
                     {isChatting && (
-                      <div className="flex gap-3 max-w-[85%]">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center border bg-cyber-card border-cyber-border text-white animate-pulse">
+                      <div className="flex items-start gap-2.5 text-xs font-mono justify-start">
+                        <div className="w-6 h-6 rounded-full border border-cyber-cyan/40 bg-cyber-cyan/5 flex items-center justify-center text-cyber-cyan text-[10px] font-bold flex-shrink-0">
                           SE
                         </div>
-                        <div className="p-3 rounded border bg-cyber-card-light/40 border-cyber-border/60 text-cyber-cyan flex items-center gap-2">
+                        <div className="p-3 rounded border border-cyber-border bg-cyber-card text-cyber-cyan/80 flex items-center gap-1.5">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Sentinel decoding event logs...</span>
+                          <span>Sentinel mapping query payload...</span>
                         </div>
                       </div>
                     )}
-
                     <div ref={chatEndRef}></div>
                   </div>
 
-                  {/* Input form */}
-                  <form onSubmit={handleSendMessage} className="p-3 bg-cyber-bg/90 border-t border-cyber-border flex items-center gap-2 no-print">
-                    <input
+                  {/* Quick Coprocessor Prompts */}
+                  <div className="border-t border-cyber-border/40 py-3 space-y-1.5">
+                    <span className="text-[8px] text-cyber-gray uppercase font-bold block">Quick AI Copilot Actions:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button 
+                        onClick={() => triggerQuickChat("Provide a detailed technical breakdown of this security incident based on the log entries.")}
+                        disabled={currentUser?.role === 'Viewer'}
+                        className="px-2 py-1 bg-cyber-bg border border-cyber-border text-[9px] text-slate-300 rounded hover:border-cyber-cyan transition-all cursor-pointer font-mono"
+                      >
+                        Explain Incident
+                      </button>
+                      <button 
+                        onClick={() => triggerQuickChat("Write a high-level executive briefing summarizing the scope, impact, and mitigation status.")}
+                        disabled={currentUser?.role === 'Viewer'}
+                        className="px-2 py-1 bg-cyber-bg border border-cyber-border text-[9px] text-slate-300 rounded hover:border-cyber-cyan transition-all cursor-pointer font-mono"
+                      >
+                        Executive Summary
+                      </button>
+                      <button 
+                        onClick={() => triggerQuickChat("Give step-by-step instructions to contain this attack immediately.")}
+                        disabled={currentUser?.role === 'Viewer'}
+                        className="px-2 py-1 bg-cyber-bg border border-cyber-border text-[9px] text-slate-300 rounded hover:border-cyber-cyan transition-all cursor-pointer font-mono"
+                      >
+                        Suggest Containment
+                      </button>
+                      <button 
+                        onClick={() => triggerQuickChat("Write a Splunk SPL search query to find other instances of this threat pattern.")}
+                        disabled={currentUser?.role === 'Viewer'}
+                        className="px-2 py-1 bg-cyber-bg border border-cyber-border text-[9px] text-slate-300 rounded hover:border-cyber-cyan transition-all cursor-pointer font-mono"
+                      >
+                        Generate SPL
+                      </button>
+                      <button 
+                        onClick={() => triggerQuickChat("Recommend firewall block rules (iptables/WAF) to filter the attacking traffic.")}
+                        disabled={currentUser?.role === 'Viewer'}
+                        className="px-2 py-1 bg-cyber-bg border border-cyber-border text-[9px] text-slate-300 rounded hover:border-cyber-cyan transition-all cursor-pointer font-mono"
+                      >
+                        Firewall Rules
+                      </button>
+                      <button 
+                        onClick={() => triggerQuickChat("Detail a forensic investigation checklist for validating similar breaches.")}
+                        disabled={currentUser?.role === 'Viewer'}
+                        className="px-2 py-1 bg-cyber-bg border border-cyber-border text-[9px] text-slate-300 rounded hover:border-cyber-cyan transition-all cursor-pointer font-mono"
+                      >
+                        Investigation Workflow
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Input Chat form */}
+                  <form onSubmit={handleChatSubmit} className="flex gap-2">
+                    <input 
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Ask Sentinel a question about this incident..."
-                      className="flex-1 p-2.5 bg-cyber-card border border-cyber-border rounded text-xs text-cyber-cyan focus:outline-none focus:border-cyber-cyan"
+                      placeholder={currentUser?.role === 'Viewer' ? 'Chat locked for Viewer role' : 'Ask Sentinel about this incident...'}
+                      disabled={isChatting || currentUser?.role === 'Viewer'}
+                      className="flex-1 p-2 bg-cyber-bg border border-cyber-border rounded text-xs text-cyber-cyan font-mono focus:outline-none focus:border-cyber-cyan"
                     />
-                    <button 
+                    <button
                       type="submit"
-                      disabled={!chatInput.trim() || isChatting}
-                      className={`p-2.5 rounded border transition-colors flex items-center justify-center cursor-pointer ${
-                        chatInput.trim() && !isChatting
-                          ? "bg-cyber-cyan text-cyber-bg border-cyber-cyan hover:bg-transparent hover:text-cyber-cyan"
-                          : "border-cyber-border bg-cyber-card text-cyber-gray cursor-not-allowed"
+                      disabled={isChatting || !chatInput.trim() || currentUser?.role === 'Viewer'}
+                      className={`p-2 border rounded transition-colors ${
+                        chatInput.trim() && !isChatting && currentUser?.role !== 'Viewer'
+                          ? 'border-cyber-cyan text-cyber-cyan hover:bg-cyber-cyan/15 cursor-pointer'
+                          : 'border-cyber-border text-cyber-gray cursor-not-allowed'
                       }`}
                     >
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-4 h-4" />
                     </button>
                   </form>
 
@@ -2002,17 +2422,83 @@ export default function Home() {
           )}
 
         </main>
-
       </div>
 
-      {/* Footer System Telemetry info */}
-      <footer className="border-t border-cyber-border py-3 px-6 bg-cyber-card/20 text-center font-mono text-[9px] text-cyber-gray flex flex-col md:flex-row items-center justify-between gap-2 z-10 no-print">
-        <div>SPLUNK SENTINEL INCIDENT RESPONSE SYSTEM // RELEASE v4.1.0 // SOC HARDENED</div>
+      {/* FOOTER */}
+      <footer className="border-t border-cyber-border bg-cyber-card/60 px-6 py-3 flex items-center justify-between text-[8px] font-mono text-cyber-gray tracking-wider z-10 flex-shrink-0">
+        <div>SPLUNK SENTINEL INCIDENT RESPONSE SYSTEM // RELEASE v2.0.0 // SOC HARDENED</div>
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1.5"><Server className="w-3 h-3 text-cyber-green" /> CLOUD MATRIX: ACTIVE</span>
-          <span className="flex items-center gap-1.5"><Network className="w-3 h-3 text-cyber-cyan" /> DEPLOYMENT PORT: localhost:3000</span>
+          <span>CLOUD MATRIX: ACTIVE</span>
+          <span>DEPLOYMENT PORT: 3000</span>
         </div>
       </footer>
+
+      {/* MODAL: CREATE INCIDENT */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm font-mono animate-fadeIn">
+          <div className="w-full max-w-lg bg-cyber-card border border-cyber-border p-6 rounded-lg space-y-4 shadow-lg">
+            
+            <div className="border-b border-cyber-border/40 pb-2 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white tracking-widest flex items-center gap-1.5 uppercase">
+                <Plus className="w-4 h-4 text-cyber-cyan" /> Manual Incident logger
+              </h3>
+              <button 
+                onClick={() => setShowCreateModal(false)}
+                className="text-cyber-red hover:underline text-xs cursor-pointer"
+              >
+                Close [X]
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateManualIncident} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] text-cyber-gray uppercase font-bold block">Incident Title / Threat Profile</label>
+                <input 
+                  type="text" 
+                  value={newIncTitle}
+                  onChange={(e) => setNewIncTitle(e.target.value)}
+                  placeholder="e.g. Host Privilege Escalation Alert"
+                  className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan focus:outline-none focus:border-cyber-cyan"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-cyber-gray uppercase font-bold block">Initial Severity Level</label>
+                <select
+                  value={newIncSeverity}
+                  onChange={(e) => setNewIncSeverity(e.target.value)}
+                  className="w-full p-2.5 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan"
+                >
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                  <option value="CRITICAL">CRITICAL</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-cyber-gray uppercase font-bold block">Source Syslogs Payload</label>
+                <textarea 
+                  value={newIncLogs}
+                  onChange={(e) => setNewIncLogs(e.target.value)}
+                  placeholder="Paste log dump entries here..."
+                  className="w-full h-36 p-3 bg-cyber-bg border border-cyber-border rounded text-cyber-cyan focus:outline-none focus:border-cyber-cyan resize-none leading-relaxed"
+                  required
+                ></textarea>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-cyber-cyan text-cyber-bg border border-cyber-cyan font-bold text-xs rounded hover:bg-transparent hover:text-cyber-cyan hover:shadow-cyan-glow transition-all uppercase cursor-pointer"
+              >
+                Submit Incident Case Record
+              </button>
+            </form>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
