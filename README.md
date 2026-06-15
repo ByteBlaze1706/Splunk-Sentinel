@@ -13,7 +13,7 @@ Splunk Sentinel V2.0 is an enterprise-grade AI-powered incident response and for
 ## ⚡ V2.0 Feature Breakdown
 
 - **Secure Authentication & Session Persistence**: Integrated with Supabase Auth for persistent analyst logins and protected routes.
-- **Granular Role-Based Access Control (RBAC)**: Supports three distinct SOC operational tiers (Admin, Security Analyst, and Viewer) to enforce separation of duties.
+- **Enterprise Role-Based Access Control (RBAC)**: Full enforcement with Admin, Security Analyst, and Viewer permissions throughout the SOC terminal.
 - **Dynamic Recharts Analytics**: High-performance visualizations displaying incident volume trends, severity spread, resolution rates, threat categories, and analyst workloads.
 - **Persistent Incident Database**: Triaged security compromises, AI forensic records, timeline chronologies, and remediation roadmap progress are synced to Supabase PostgreSQL.
 - **Analyst Audit Logs**: Centralizes all SOC team activities (logins, assignments, status changes, PDF exports) into a searchable live audit feed.
@@ -30,9 +30,9 @@ Splunk Sentinel V2.0 is an enterprise-grade AI-powered incident response and for
   <img src="public/screenshots/register.png" width="48%" alt="Registration Desk" />
 </div>
 
-*Caption: The V2.0 login terminal and analyst registration dashboard featuring quick development authenticators.*
+*Caption: Secure login and analyst registration interface with role-based access control.
 
-- **Description**: Standard-compliant credentials management panel with custom-styled input forms, secure route guards, and quick auth shortcuts.
+- **Description**: Standard-compliant credentials management panel with custom-styled input forms and secure route guards.
 - **Key Features**:
   - Encrypted credential handling.
   - Interactive profile registration with role assignments.
@@ -227,7 +227,8 @@ Chronological trails of user changes and actions in the SOC.
 | :--- | :---: | :---: | :---: |
 | View Dashboards & Charts | ✓ | ✓ | ✓ |
 | View Incident Records | ✓ | ✓ | ✓ |
-| Search & Export PDF Reports | ✓ | ✓ | ✓ |
+| Search Reports | ✓ | ✓ | ✓ |
+| Export PDF Reports | ✓ | ✓ | Locked |
 | Paste Logs & Run Heuristics | ✓ | ✓ | Locked |
 | Toggle Containment Checklist | ✓ | ✓ | Locked |
 | Chat with Logs Coprocessor | ✓ | ✓ | Locked |
@@ -284,7 +285,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 # OpenAI Cognitive Brain Credentials (Optional)
 OPENAI_API_KEY=sk-proj-your-api-key-here
 ```
-*Note: If credentials are not specified, Splunk Sentinel will automatically bootstrap in **Mock Mode** using persistent LocalStorage databases and offline heuristic sandboxes. You can test all views, quick logins, assignment changes, chats, and report exports out-of-the-box.*
+*Note: If credentials are not specified, Splunk Sentinel will automatically bootstrap in **Mock Mode** using persistent LocalStorage databases and offline heuristic sandboxes. You can test all platform features using registered Analyst and Viewer accounts in Mock Mode, including incident management, reporting, chat coprocessor interactions, and forensic workflows.*
 
 ---
 
