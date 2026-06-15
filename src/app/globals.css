@@ -1,26 +1,127 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+@theme {
+  --color-cyber-bg: #040811;
+  --color-cyber-card: #0a0f1d;
+  --color-cyber-card-light: #12182c;
+  --color-cyber-border: #1e293b;
+  --color-cyber-border-active: #00f0ff;
+  --color-cyber-cyan: #00f0ff;
+  --color-cyber-red: #ff0055;
+  --color-cyber-green: #00ff88;
+  --color-cyber-amber: #ffa500;
+  --color-cyber-gray: #64748b;
+  --color-cyber-text: #cbd5e1;
+  
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #040811;
+  --foreground: #f1f5f9;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom cyberpunk effects */
+.cyber-grid {
+  background-size: 30px 30px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 240, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.02) 1px, transparent 1px);
+}
+
+.shadow-cyan-glow {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+}
+
+.shadow-red-glow {
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.15);
+}
+
+.shadow-green-glow {
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
+}
+
+.text-shadow-cyan {
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+}
+
+.text-shadow-red {
+  text-shadow: 0 0 8px rgba(255, 0, 85, 0.5);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050a15;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+}
+
+/* Scanning effect for analysis loader */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.animate-scan {
+  animation: scan 3s linear infinite;
+}
+
+/* Blink cursor for terminal effect */
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s step-start infinite;
+}
+
+/* Cyber grid active border glow */
+.cyber-border-active {
+  position: relative;
+}
+
+.cyber-border-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid #00f0ff;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Media printing tweaks for professional report output */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-card {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    color: black !important;
+  }
 }
