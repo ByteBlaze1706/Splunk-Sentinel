@@ -871,67 +871,67 @@ export default function Home() {
       <div className="flex-1 flex flex-col md:flex-row relative">
 
         {/* Sidebar Nav */}
-        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-cyber-border bg-cyber-card/40 flex flex-row md:flex-col p-4 gap-2 z-10">
+        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-cyber-border bg-cyber-card/40 flex flex-row md:flex-col p-4 gap-2 z-10 overflow-x-auto md:overflow-x-visible whitespace-nowrap md:whitespace-normal scrollbar-none">
           <div className="hidden md:block px-3 py-2 text-[10px] font-mono text-cyber-gray tracking-wider uppercase mb-2">SOC Navigation</div>
           
           <button 
             onClick={() => { setActiveView("dashboard"); setSelectedIncident(null); }}
-            className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
               activeView === "dashboard" 
                 ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
                 : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
-            <span className="hidden sm:inline md:inline">Dashboard</span>
+            <span>DASHBOARD</span>
           </button>
           
           <button 
             onClick={() => { setActiveView("analyzer"); }}
-            className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
               activeView === "analyzer" 
                 ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
                 : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
             }`}
           >
             <FileSearch className="w-4 h-4" />
-            <span className="hidden sm:inline md:inline">Log Analyzer</span>
+            <span>LOG ANALYZER</span>
           </button>
 
           <button 
             onClick={() => { setActiveView("history"); }}
-            className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
               activeView === "history" || activeView === "detail"
                 ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
                 : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
             }`}
           >
             <History className="w-4 h-4" />
-            <span className="hidden sm:inline md:inline">Incident History</span>
+            <span>INCIDENT HISTORY</span>
           </button>
 
           <button 
             onClick={() => { setActiveView("splunk-mcp"); }}
-            className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
               activeView === "splunk-mcp" 
                 ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
                 : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
             }`}
           >
             <Database className="w-4 h-4" />
-            <span className="hidden sm:inline md:inline">Splunk Integration</span>
+            <span>SPLUNK INTEGRATION</span>
           </button>
 
           <button 
             onClick={() => { setActiveView("settings"); }}
-            className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
+            className={`flex-shrink-0 md:flex-initial flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded text-xs font-mono transition-all border ${
               activeView === "settings" 
                 ? "bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan shadow-cyan-glow" 
                 : "border-transparent text-slate-400 hover:text-white hover:bg-cyber-card-light/50"
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline md:inline">System Settings</span>
+            <span>SYSTEM SETTINGS</span>
           </button>
 
           {/* Quick-Stats inside Sidebar on Desktop */}
@@ -1479,7 +1479,7 @@ export default function Home() {
               <div className="p-6 border border-cyber-border bg-cyber-card/40 rounded space-y-4">
                 <h3 className="text-sm font-mono font-bold text-white tracking-wider border-b border-cyber-border/40 pb-2 flex items-center gap-2">
                   <Activity className="w-4 h-4 text-cyber-cyan" />
-                  Real-time Ingestion & MCP Integration Roadmap
+                  Splunk MCP Integration Roadmap
                 </h3>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 font-mono text-xs">
@@ -1505,7 +1505,7 @@ export default function Home() {
 
                   <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2 flex flex-col justify-between">
                     <div>
-                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">3. Real-Time Streaming</span>
+                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">3. Real-Time Log Streaming</span>
                       <p className="text-slate-400 text-[10px] leading-relaxed mt-1.5">
                         Streams security alerts directly from the Splunk HTTP Event Collector (HEC) into the Sentinel priority triage queue.
                       </p>
@@ -1515,7 +1515,7 @@ export default function Home() {
 
                   <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2 flex flex-col justify-between">
                     <div>
-                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">4. Agentic SecOps</span>
+                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">4. Agentic Security Operations</span>
                       <p className="text-slate-400 text-[10px] leading-relaxed mt-1.5">
                         Deploys autonomous AI search agents to hunt for advanced persistent threats (APTs) using automated Splunk SPL queries.
                       </p>

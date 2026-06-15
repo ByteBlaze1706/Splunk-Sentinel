@@ -12,22 +12,13 @@ Security Operations Centers (SOCs) are overwhelmed by an exponential volume of r
 
 ---
 
-## 💡 Solution
+## 💡 Solution Overview
 **Splunk Sentinel** acts as a cognitive co-pilot that sits alongside the analyst. By combining heuristics-based analysis (for local offline safety) and LLM analysis (for semantic reasoning), Sentinel:
 - Automatically parses threat details (Attack vector, root cause, timeline).
-- Recomends containment checklists with an interactive task manager.
+- Recommends containment checklists with an interactive task manager.
 - Provides a context-aware chat assistant that answers direct forensic questions using the logs' context.
 - Exports executive-ready PDF containment reports with a single click.
 - Prepares operations for the next generation of Splunk Model Context Protocol (MCP) integrations.
-
----
-
-## 🔁 How Splunk Fits Into The Workflow
-- **Splunk generates and stores security telemetry**: Splunk indexers actively compile authorization logs, web server traces, system shell metrics, and network packets from enterprise assets.
-- **Splunk Sentinel consumes Splunk-generated events**: Raw event alerts are streamed from Splunk Cloud/Enterprise indices directly to Sentinel’s analysis pipeline.
-- **AI analyzes incidents**: The AI Threat Analysis Engine extracts key IOC metrics (attacks vector, timeline, signatures) and calculates a severity score.
-- **Analysts interact through the Sentinel Coprocessor**: Incident responders converse directly with the context-aware chatbot to investigate details or retrieve SPL query help.
-- **AI generates remediation plans and reports**: Sentinel automatically compiles step-by-step containment checklists and exports C-suite restricted PDF reports.
 
 ---
 
@@ -42,14 +33,45 @@ Security Operations Centers (SOCs) are overwhelmed by an exponential volume of r
 
 ---
 
-## 🎨 Social Preview & Branding
-Here is a preview of the Splunk Sentinel identity:
+## 🔁 How Splunk Fits Into The Workflow
+Splunk Sentinel bridges the gap between raw data collection and cognitive automated response. The data flow operates as follows:
 
-![Splunk Sentinel Social Preview](src/app/opengraph-image.svg)
+```
+Splunk Enterprise / Splunk Cloud
+      ↓
+Security Telemetry (raw web server logs, auth events, system traces)
+      ↓
+Splunk Sentinel Ingestion Layer (ingests logs via API or file upload)
+      ↓
+AI Threat Analysis Engine (LLM-driven logical reasoning mapping threat vectors)
+      ↓
+Incident Correlation Engine (parses and structures timelines, severities, and targets)
+      ↓
+Sentinel Chat Coprocessor (interactive chat interface for deep forensic queries)
+      ↓
+Remediation Recommendations (issues custom actionable containment checklists)
+      ↓
+PDF Report Export (downloads executive-ready forensics and containment summary)
+```
+
+- **Splunk generates and stores security telemetry**: Splunk indexers actively compile authorization logs, web server traces, system shell metrics, and network packets from enterprise assets.
+- **Splunk Sentinel consumes Splunk-generated events**: Raw event alerts are streamed from Splunk Cloud/Enterprise indices directly to Sentinel’s analysis pipeline.
+- **AI analyzes incidents**: The AI Threat Analysis Engine extracts key IOC metrics (attacks vector, timeline, signatures) and calculates a severity score.
+- **Analysts interact through the Sentinel Coprocessor**: Incident responders converse directly with the context-aware chatbot to investigate details or retrieve SPL query help.
+- **AI generates remediation plans and reports**: Sentinel automatically compiles step-by-step containment checklists and exports C-suite restricted PDF reports.
 
 ---
 
-## 🗺️ Architecture Diagram
+## 💬 AI Coprocessor Workflow
+1. **Log Context Ingestion**: When an incident is loaded or raw logs are analyzed, the system stores the raw text representation in context.
+2. **Context-Aware Prompting**: All chat prompts submitted to the coprocessor are prepended with the parsed incident metadata, source logs, and key artifacts.
+3. **Conversational Forensic Investigation**: The analyst queries specific parameters (e.g., "Which accounts are compromised?").
+4. **Actionable Suggestions**: The coprocessor responds with immediate mitigation instructions, terminal shell commands, or Splunk Search Processing Language (SPL) queries.
+
+---
+
+## 🗺️ Architecture
+The system uses the following structural component relationship:
 
 ```mermaid
 graph TD
@@ -74,31 +96,18 @@ graph TD
 
 ---
 
-## 💻 Tech Stack
-- **Framework**: Next.js 15 (App Router, JavaScript-only configuration)
-- **Styling**: Tailwind CSS v4 & PostCSS
-- **State Management**: React State Hooks & lazy `localStorage` initializers (purity-safe)
-- **AI Integration**: OpenAI SDK
-- **PDF Core**: jsPDF (client-side)
-- **Iconography**: Lucide React
+## 🚀 Installation
+Follow these steps to set up Splunk Sentinel locally:
 
----
-
-## 🚀 Setup Instructions
-
-1. Clone or clone the repository:
+1. Clone the repository:
    ```bash
+   git clone https://github.com/ByteBlaze1706/Splunk-Sentinel.git
    cd Splunk-Sentinel
    ```
 2. Install dependencies:
    ```bash
    npm install
    ```
-3. Run the development server:
-   ```bash
-   npm run dev
-   ```
-4. Access the web interface at `http://localhost:3000`.
 
 ---
 
@@ -108,6 +117,15 @@ To enable live OpenAI completions, create a `.env.local` file at the root:
 OPENAI_API_KEY=sk-proj-your-api-key-here
 ```
 *Note: If no API key is specified in the environment variables, the platform automatically starts in **Mock Mode**, allowing you to test all buttons, analyzers, chatbots, and PDF download functions using local heuristics presets.*
+
+---
+
+## 💻 Local Development
+Start the Next.js development server:
+```bash
+npm run dev
+```
+Access the web interface at `http://localhost:3000`.
 
 ---
 
@@ -123,7 +141,7 @@ This project is configured for one-click deployment on **Vercel**:
    ```bash
    vercel --yes
    ```
-3. Promote the preview build to production:
+3. Promote the build to production:
    ```bash
    vercel --prod --yes
    ```
@@ -131,26 +149,24 @@ This project is configured for one-click deployment on **Vercel**:
 ### Option 2: GitHub Integration
 1. Push this repository to your GitHub account.
 2. Link the repository to your Vercel Dashboard.
-3. Configure `OPENAI_API_KEY` under the project environment variables if live completions are desired.
-4. Trigger the deployment.
+3. Configure `OPENAI_API_KEY` under project environment variables if live completions are desired.
+4. Trigger deployment.
 
 ---
 
-## 🔮 Splunk MCP Roadmap
+## 🔮 Future Splunk MCP Integration
 Model Context Protocol (MCP) bridges LLM models with remote server contexts. In Splunk Sentinel, an MCP integration allows direct access to search heads:
 
 1. **Splunk Enterprise & Splunk Cloud support**: Authenticates directly with Splunk REST endpoints using secure bearer tokens.
 2. **Splunk MCP Link**: Establishes a WebSocket JSON-RPC bridge between the AI model and the Splunk Daemon.
-3. **Real-time Log Streaming**: Attaches listeners directly to Splunk HEC (HTTP Event Collector) for real-time breach detection.
-4. **Agentic Security Operations**: Deploys autonomous AI search agents to hunt for advanced persistent threats (APTs) using SPL queries.
+3. **Real-Time Log Streaming**: Attaches listeners directly to Splunk HEC (HTTP Event Collector) for real-time breach detection.
+4. **Agentic Security Operations**: Deploys autonomous AI search agents to hunt for advanced persistent threats (APTs) using automated Splunk SPL queries.
 5. **SOAR Playbooks Sync**: Automatically maps completed remediation items in the containment checklist to Splunk Phantom SOAR playbooks.
 
 ---
 
-## 🚀 Future Enhancements
-- **Multi-tenant SOC view**: Toggle between multiple active client networks.
-- **Custom SPL Translators**: Translate natural language commands directly to Splunk search commands.
-- **Encrypted Local Storage**: Encrypt cached logs on local disks to secure PII.
+## 📄 License
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
