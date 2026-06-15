@@ -30,7 +30,7 @@ Splunk Sentinel V2.0 is an enterprise-grade AI-powered incident response and for
   <img src="public/screenshots/register.png" width="48%" alt="Registration Desk" />
 </div>
 
-*Caption: Secure login and analyst registration interface with role-based access control.
+*Caption: Secure login and analyst registration interface with role-based access control.*
 
 - **Description**: Standard-compliant credentials management panel with custom-styled input forms and secure route guards.
 - **Key Features**:
