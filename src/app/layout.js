@@ -12,8 +12,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Splunk Sentinel - AI Cybersecurity Incident Response Platform",
-  description: "Next-generation security operations center (SOC) co-pilot powered by cognitive AI.",
+  title: "Splunk Sentinel",
+  description: "AI-Powered Security Operations Copilot for Threat Detection, Incident Investigation, and Automated Response.",
+  keywords: [
+    "Cybersecurity",
+    "Splunk",
+    "SOC",
+    "Threat Detection",
+    "Incident Response",
+    "Security Operations",
+    "AI Security"
+  ],
 };
 
 export default function RootLayout({ children }) {

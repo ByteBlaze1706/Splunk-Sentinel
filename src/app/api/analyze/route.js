@@ -18,7 +18,7 @@ export async function POST(req) {
       return Response.json({
         ...mockAnalysis,
         mocked: true,
-        modelUsed: "Splunk Sentinel Local Heuristics (v4.0)"
+        modelUsed: "MOCK ENGINE"
       });
     }
 
@@ -61,7 +61,7 @@ Do not include any markdown styling, code block wrappers (like \`\`\`json), or n
     return Response.json({
       ...parsedData,
       mocked: false,
-      modelUsed: model
+      modelUsed: "OPENAI ANALYSIS"
     });
   } catch (error) {
     console.error("Analysis API Error:", error);

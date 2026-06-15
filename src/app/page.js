@@ -74,7 +74,7 @@ const INITIAL_INCIDENTS = [
       { role: "assistant", content: "Hello, I am Sentinel. I have compiled the analysis for this SSH Brute Force attack. The attacker achieved root privilege via passwordless sudo find execution. How would you like to proceed with containment?", timestamp: "14:23:10" }
     ],
     mocked: true,
-    modelUsed: "Splunk Sentinel Local Heuristics"
+    modelUsed: "MOCK ENGINE"
   },
   {
     id: "INC-2026-1002",
@@ -113,7 +113,7 @@ const INITIAL_INCIDENTS = [
       { role: "assistant", content: "Warning: Database exposure confirmed. The logs capture table dumps being requested from 203.0.113.88. Parameterized queries must be implemented. I can write a remediation query or configuration script for you. What language is the backend written in?", timestamp: "15:12:05" }
     ],
     mocked: true,
-    modelUsed: "Splunk Sentinel Local Heuristics"
+    modelUsed: "MOCK ENGINE"
   },
   {
     id: "INC-2026-1003",
@@ -150,7 +150,7 @@ const INITIAL_INCIDENTS = [
       { role: "assistant", content: "I've flagged this Impossible Travel incident. The access of '2026_Q2_Salaries.xlsx' is highly concerning. I recommend immediately locking Alice's AD account to block exfiltration.", timestamp: "14:05:00" }
     ],
     mocked: true,
-    modelUsed: "Splunk Sentinel Local Heuristics"
+    modelUsed: "MOCK ENGINE"
   }
 ];
 
@@ -1474,24 +1474,55 @@ export default function Home() {
                   Real-time Ingestion & MCP Integration Roadmap
                 </h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
-                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2">
-                    <span className="text-cyber-cyan font-bold block text-[11px]">PHASE 1: LIVE INGESTION</span>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">
-                      Establish persistent WebSocket listeners between Sentinel and Splunk HTTP Event Collector (HEC) for real-time alerting feeds.
-                    </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 font-mono text-xs">
+                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">1. Enterprise &amp; Cloud</span>
+                      <p className="text-slate-400 text-[10px] leading-relaxed mt-1.5">
+                        Native integrations for both Splunk Enterprise (on-prem) and Splunk Cloud REST endpoints, using token authorization.
+                      </p>
+                    </div>
+                    <span className="text-[9px] text-cyber-green bg-cyber-green/10 px-1 rounded self-start mt-2 border border-cyber-green/20">SUPPORTED</span>
                   </div>
-                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2">
-                    <span className="text-cyber-cyan font-bold block text-[11px]">PHASE 2: COGNITIVE SEARCH</span>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">
-                      Deploy Splunk MCP JSON-RPC endpoints enabling Sentinel LLM core to write SPL queries and search indexes via natural language commands.
-                    </p>
+
+                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">2. Splunk MCP Link</span>
+                      <p className="text-slate-400 text-[10px] leading-relaxed mt-1.5">
+                        Uses Model Context Protocol JSON-RPC schemas over WebSockets to connect the Sentinel model to index schemas.
+                      </p>
+                    </div>
+                    <span className="text-[9px] text-cyber-cyan bg-cyber-cyan/10 px-1 rounded self-start mt-2 border border-cyber-cyan/20">MCP VERSION 1.0</span>
                   </div>
-                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2">
-                    <span className="text-cyber-cyan font-bold block text-[11px]">PHASE 3: SOAR AUTOMATION</span>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">
-                      Map Sentinel Remediation checklist triggers directly to Splunk Phantom SOAR playbooks to lock AD accounts and adjust firewalls.
-                    </p>
+
+                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">3. Real-Time Streaming</span>
+                      <p className="text-slate-400 text-[10px] leading-relaxed mt-1.5">
+                        Streams security alerts directly from the Splunk HTTP Event Collector (HEC) into the Sentinel priority triage queue.
+                      </p>
+                    </div>
+                    <span className="text-[9px] text-cyber-cyan bg-cyber-cyan/10 px-1 rounded self-start mt-2 border border-cyber-cyan/20">ROADMAP</span>
+                  </div>
+
+                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">4. Agentic SecOps</span>
+                      <p className="text-slate-400 text-[10px] leading-relaxed mt-1.5">
+                        Deploys autonomous AI search agents to hunt for advanced persistent threats (APTs) using automated Splunk SPL queries.
+                      </p>
+                    </div>
+                    <span className="text-[9px] text-cyber-cyan bg-cyber-cyan/10 px-1 rounded self-start mt-2 border border-cyber-cyan/20">ROADMAP</span>
+                  </div>
+
+                  <div className="p-4 bg-cyber-bg/50 rounded border border-cyber-border/60 space-y-2 flex flex-col justify-between">
+                    <div>
+                      <span className="text-cyber-cyan font-bold block text-[11px] uppercase">5. SOAR Playbooks</span>
+                      <p className="text-slate-400 text-[10px] leading-relaxed mt-1.5">
+                        Triggers Splunk Phantom / SOAR containment playbooks to automatically lock compromised user accounts and block IPs.
+                      </p>
+                    </div>
+                    <span className="text-[9px] text-cyber-cyan bg-cyber-cyan/10 px-1 rounded self-start mt-2 border border-cyber-cyan/20">SOAR SYNC</span>
                   </div>
                 </div>
               </div>
@@ -1863,7 +1894,7 @@ export default function Home() {
                       <div className="w-2.5 h-2.5 rounded-full bg-cyber-cyan animate-pulse"></div>
                       <span className="text-xs font-bold text-white tracking-wider uppercase">SENTINEL CHAT COPROCESSOR</span>
                     </div>
-                    <span className="text-[9px] text-cyber-gray">MODEL: {openaiKey ? selectedModel : "LOCAL"}</span>
+                    <span className="text-[9px] text-cyber-gray font-mono">ENGINE: {openaiKey ? "OPENAI ANALYSIS" : "MOCK ENGINE"}</span>
                   </div>
 
                   {/* Prompt Quick Buttons */}
