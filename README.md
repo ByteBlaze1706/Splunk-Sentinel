@@ -1,136 +1,175 @@
 # Splunk Sentinel V2.0
 
-AI-Powered Enterprise Security Operations Center (SOC) Copilot.
-
-Splunk Sentinel V2.0 elevates the platform from a hackathon demo into a production-grade multi-user incident response platform. It integrates secure user authentication, role-based access control, real-time database persistence, interactive telemetry analytics, detailed timeline auditing, and a dedicated reports management center.
+### AI-Powered Enterprise Security Operations Center (SOC) Copilot
 
 ---
 
-## ⚡ V2.0 Core Upgrades
-1. **Authentication & Session Persistence**: Integrated with Supabase Auth for persistent analyst logins and protected routes.
-2. **Role-Based Access Control (RBAC)**: Supports three operational tiers:
-   - **Admin**: Full authority to edit, assign, delete cases, and configure integrations.
-   - **Security Analyst**: Core investigation authority (analyze logs, toggle containment checklist tasks, interact with AI).
-   - **Viewer**: Read-only oversight access (Dashboard, Reports, History, Splunk MCP views). Cannot run scans or modify data.
-3. **Analytics Dashboard**: Outfitted with dynamic **Recharts** visualizations displaying incident volume trends, severity spread, resolution rates, threat categories, and analyst workloads.
-4. **Persistent Case Databases**: Stores raw events, timelines, AI forensic details, and containment progress in persistent PostgreSQL tables.
-5. **Analyst Timeline Audits**: Records all terminal actions (user logins, assignments, status changes, PDF exports) into a central timeline.
-6. **SOC Report Center**: Filters, searches, and manages generated PDF forensic summaries.
-7. **Splunk HTTP Event Collector (HEC)**: Added architecture-ready configurations to stream live log feeds.
+![Splunk Sentinel Banner](public/screenshots/hero_banner.jpg)
+
+Splunk Sentinel V2.0 is an enterprise-grade AI-powered incident response and forensic analysis platform designed for modern Security Operations Centers (SOC). Tailored to integrate seamlessly with Splunk Enterprise and Splunk Cloud ecosystems, Splunk Sentinel ingests raw, unstructured security telemetry, automatically correlates events, translates complex system and authentication logs into structured chronologies, and assists analysts via a context-aware AI Security Coprocessor.
 
 ---
 
-## 📸 Screenshots & Features
+## ⚡ V2.0 Feature Breakdown
 
-### 1. Security Operations Center Dashboard
+- **Secure Authentication & Session Persistence**: Integrated with Supabase Auth for persistent analyst logins and protected routes.
+- **Granular Role-Based Access Control (RBAC)**: Supports three distinct SOC operational tiers (Admin, Security Analyst, and Viewer) to enforce separation of duties.
+- **Dynamic Recharts Analytics**: High-performance visualizations displaying incident volume trends, severity spread, resolution rates, threat categories, and analyst workloads.
+- **Persistent Incident Database**: Triaged security compromises, AI forensic records, timeline chronologies, and remediation roadmap progress are synced to Supabase PostgreSQL.
+- **Analyst Audit Logs**: Centralizes all SOC team activities (logins, assignments, status changes, PDF exports) into a searchable live audit feed.
+- **PDF Report Center**: An administrative control panel to search, filter, and archive generated PDF forensics reports.
+
+---
+
+## 📸 Platform Walkthrough
+
+### 1. Authentication & Role-Based Access Control
+
+<div align="center">
+  <img src="public/screenshots/login.png" width="48%" alt="Login Panel" />
+  <img src="public/screenshots/register.png" width="48%" alt="Registration Desk" />
+</div>
+
+*Caption: The V2.0 login terminal and analyst registration dashboard featuring quick development authenticators.*
+
+- **Description**: Standard-compliant credentials management panel with custom-styled input forms, secure route guards, and quick auth shortcuts.
+- **Key Features**:
+  - Encrypted credential handling.
+  - Interactive profile registration with role assignments.
+  - Instant session expiration on logout.
+- **Role Permissions**: Checks credentials against database profiles to gate UI actions and features.
+
+---
+
+### 2. Security Operations Center (SOC) Dashboard
+
 ![SOC Dashboard](public/screenshots/dashboard.png)
-*Caption: Splunk Sentinel SOC Dashboard showing live database metrics, Recharts volume trends, severity distribution, analyst workload bar charts, and the live audit timeline feed.*
-- **Description**: Displays aggregated security telemetry, critical alert counters, active workloads, and the system activity timeline.
-- **AI Contribution**: Continuously maps incident workloads and groups them into chronological trends.
-- **Splunk Integration**: Visualizes event counts streaming from Splunk endpoints.
+
+*Caption: Live SOC dashboard displaying dynamic analytics, metrics grids, and real-time active workload charts.*
+
+- **Description**: Central analytics screen giving SOC leadership and analysts high-level oversight of ongoing alerts and triaging efficiency.
+- **Key Features**:
+  - Live incident counts and containment metrics.
+  - Interactive charts powered by Recharts (volume trends, severity spread, resolution efficiency, workloads, threat categories).
+  - Chronological live audit timeline feed reflecting team operations.
+- **AI Role / Contribution**: Translates incident database tables into aggregated trends and categories dynamically.
+- **Splunk Integration**: Supports monitoring and visualizing telemetry event volumes ingested from Splunk search heads.
 
 ---
 
-### 2. Cognitive Log Analyzer
-![Log Analyzer](public/screenshots/log_analyzer.png)
-*Caption: The Log Analyzer sandbox for pasting raw log strings or uploading log files.*
-- **Description**: Features dropzones and preset simulators (SSH Brute Force, Web SQL Injection, Linux privilege escalation, Impossible Travel Auth) for immediate forensic classification.
-- **AI Contribution**: Decrypts raw security logs to produce structured incident timelines and containment checklists.
+### 3. Cognitive Log Analyzer
+
+![Cognitive Log Analyzer](public/screenshots/log_analyzer.png)
+
+*Caption: The cognitive analyzer workspace supporting text log drops, file imports, and preset simulations.*
+
+- **Description**: Interactive workspace where analysts paste raw system log segments, upload log dumps, or run preset breach vectors to start forensic triaging.
+- **Key Features**:
+  - Drag-and-drop log file reader.
+  - Simulated templates (SSH Brute Force, SQL Injection, Sudo Privilege Escalation, Impossible Travel).
+  - Progressive animated analyzer phases (IP reputation matching, heuristics routing, and logical schema parsing).
+- **AI Role / Contribution**: Automatically isolates attacking source IPs, target assets, targeted accounts, and event signatures.
+- **Splunk Integration**: Conceptually routes raw syslogs or JSON payloads to `/api/analyze` for on-demand investigation.
 
 ---
 
-### 3. AI Incident Investigation Report
-![AI Incident Investigation Report](public/screenshots/forensics_report.png)
-*Caption: Forensic Detail View displaying parsed root cause summaries and extracted IOC indicators.*
-- **Description**: Converts unreadable log dumps into human-readable briefs containing attacker IPs, target hosts, and compromised credentials.
-- **AI Contribution**: Parses attacker routes and determines incident root cause.
+### 4. Manual Incident Creation
+
+![Manual Incident Logger](public/screenshots/manual_incident_logger.png)
+
+*Caption: Manual incident logger modal for recording ad-hoc alerts in the SOC database.*
+
+- **Description**: Modal form permitting authorized analysts to manually log custom system alerts directly into the triaging queue.
+- **Key Features**:
+  - Form validation for incident titles, raw log dumps, and severity levels.
+  - Auto-generated unique tracking numbers (e.g., INC-2026-4331).
+  - Direct background database insertion.
+- **AI Role / Contribution**: Instantly initializes case files with default containment recommendations.
+- **Splunk Integration**: Simulates receiving syslog payloads directly from firewalls or application endpoints.
 
 ---
 
-### 4. Sentinel Chat Coprocessor V2
-![Sentinel Chat Coprocessor](public/screenshots/forensics_report.png)
-*Caption: The Chat Coprocessor panel with pre-seeded query shortcuts for quick containment commands.*
-- **Description**: Context-aware chat panel pre-seeded with case log contents. Features quick-actions like generating SPL hunting queries, recommending WAF block rules, or detailing containment checklists.
-- **AI Contribution**: Translates natural language into command blocks and MITRE ATT&CK maps.
+### 5. Incident History & Lifecycle Management
+
+![Incident History](public/screenshots/incident_history.png)
+
+*Caption: Compromise database records management panel showing case files, severities, and owners.*
+
+- **Description**: Central table listing all current and resolved incident records stored in the persistent database.
+- **Key Features**:
+  - Searchable list sorted chronologically.
+  - Dynamic visual tags indicating case status and severity levels.
+  - Quick access buttons to view forensic details or delete files (Admin-only).
+- **Splunk Integration**: Stores telemetry reference markers and index identifiers mapping cases back to Splunk datasets.
 
 ---
 
-### 5. Timeline Correlation & Remediation
-![Timeline Correlation & Remediation](public/screenshots/timeline_remediation.png)
-*Caption: Incident timeline correlation details and actionable containment checklists.*
-- **Description**: Maps threat times into chronological logs and issues checkable mitigation checklists that update case resolution scores.
+### 6. Forensic Investigation Workspace & Chat Coprocessor
+
+![Forensics Workspace](public/screenshots/forensics_workspace.png)
+
+*Caption: Forensic Detail screen with AI executive summary, technical root cause, checklist, and Chat Coprocessor V2.*
+
+- **Description**: Detailed case panel containing parsed IOC arrays, root cause analysis blocks, checkable remediation playbooks, and the context-aware chat coprocessor.
+- **Key Features**:
+  - Structured executive briefs and technical root cause analysis cards.
+  - Dynamic checkable containment checklist that syncs resolution rates back to the database.
+  - Context-aware chat coprocessor pre-seeded with case log contents.
+  - Pre-seeded AI quick actions: *Explain Incident*, *Generate SPL Hunting Query*, *Suggest Containment*, *Suggest WAF Block Rules*, *Show Investigation Workflow*.
+- **AI Role / Contribution**: Conducts logical reasoning based on raw logs, generates Splunk Search Processing Language (SPL) hunting queries, and provides customized containment checklists.
+- **Splunk Integration**: The generated SPL queries can be copied directly and run in Splunk search heads to scan for similar breach signatures.
 
 ---
 
-### 6. Splunk MCP Integration Workspace
-![Splunk MCP Integration Workspace](architecture-diagram.png)
-*Caption: The Splunk Integration configuration workspace.*
-- **Description**: Maps remote Splunk REST daemon endpoints and WebSocket JSON-RPC interfaces.
-- **Splunk Integration**: Supports connecting directly to port 8089 to query indices.
+### 7. PDF Report Generation & Report Center
+
+<div align="center">
+  <img src="public/screenshots/pdf_report.png" width="48%" alt="PDF Preview" />
+  <img src="public/screenshots/report_center.png" width="48%" alt="Report Center" />
+</div>
+
+*Caption: Two-page PDF investigation report preview and the Report Center management board.*
+
+- **Description**: Forensic PDF compiler that generates multi-page reports with executive summaries, technical root causes, compromised indicators, containment checklists, and analyst timelines. The Report Center tracks and archives all generated reports.
+- **Key Features**:
+  - Client-side PDF compilation using `jsPDF` with cyber-SOC styled elements.
+  - Searchable Report Center filtering logs by severity, generating analyst, and date.
+- **AI Role / Contribution**: Populates the report fields with structured threat intelligence descriptions.
+- **Splunk Integration**: Captures final forensic reports for audit logging and archives.
 
 ---
 
-### 7. Cognitive Core Configuration
-![Cognitive Core Configuration](public/screenshots/settings.png)
-*Caption: Core settings workspace.*
-- **Description**: Manages OpenAI API credentials and toggles logical reasoning models (gpt-4o, gpt-4o-mini).
+### 8. Splunk Ingestion Workspace
+
+![Splunk Ingestion Workspace](public/screenshots/splunk_integration.png)
+
+*Caption: Configuration board for HTTP Event Collector (HEC) logs streaming and Daemon MCP bridge connections.*
+
+- **Description**: Integration panel to configure HTTP Event Collector (HEC) endpoints and Model Context Protocol (MCP) daemon setups.
+- **Key Features**:
+  - Form parameters for Splunk host URLs, indexes, and authentication tokens.
+  - Live mock bridge console showing connection states and log streaming traces.
+- **Splunk Integration**: Configures the ingestion endpoint to forward security telemetry from Splunk indexers directly to Splunk Sentinel.
 
 ---
 
-## 🔁 How Splunk Fits Into The Workflow
-```
-Splunk Enterprise / Splunk Cloud
-      ↓
-Security Telemetry (raw web server logs, auth events, system traces)
-      ↓
-Splunk Sentinel Ingestion Layer (ingests logs via API or file upload)
-      ↓
-AI Threat Analysis Engine (LLM-driven logical reasoning mapping threat vectors)
-      ↓
-Incident Correlation Engine (parses and structures timelines, severities, and targets)
-      ↓
-Sentinel Chat Coprocessor (interactive chat interface for deep forensic queries)
-      ↓
-Remediation Recommendations (issues custom actionable containment checklists)
-      ↓
-PDF Investigation Report (downloads executive-ready forensics and containment summary)
-```
+### 9. System Configuration Panel
 
----
+![System Configuration Panel](public/screenshots/settings.png)
 
-## 🗺️ System Architecture
+*Caption: Cognitive Core configuration dashboard for LLM API keys and model parameters.*
 
-```mermaid
-graph TD
-    User([Security Analyst]) -->|1. Pastes/Uploads Logs| WebUI[Splunk Sentinel Web Interface]
-    WebUI -->|Local Cache| LocalStorage[(Browser LocalStorage / Session)]
-    
-    subgraph Supabase Database Services
-        WebUI -->|Auth Session| Auth[Supabase Auth]
-        WebUI -->|Sync Operations| DB[(Supabase PostgreSQL)]
-    end
-
-    subgraph Backend Services
-        WebUI -->|2. POST Raw Logs| API_Analyze[Next.js API: /api/analyze]
-        WebUI -->|3. Chat Context| API_Chat[Next.js API: /api/chat]
-    end
-    
-    subgraph Cognitive Core
-        API_Analyze -->|Heuristics Match| Heuristics[Local Heuristics Sandbox]
-        API_Analyze -->|Active Key| OpenAI[OpenAI API Core]
-        API_Chat -->|Heuristics Match| Heuristics
-        API_Chat -->|Active Key| OpenAI
-    end
-    
-    WebUI -->|4. Compiles PDF| jsPDF[jsPDF Client-Side Compiler]
-    jsPDF -->|Downloads| PDFReport[Forensic Report PDF]
-```
+- **Description**: Configuration manager to save OpenAI API keys and toggle the active AI reasoning model.
+- **Key Features**:
+  - LocalStorage caching for user keys.
+  - Dropdown selector supporting `gpt-4o` and `gpt-4o-mini` models.
+- **AI Role / Contribution**: Gates the OpenAI SDK connection settings and configures the active reasoning engine.
 
 ---
 
 ## 🗄️ Supabase Database Schema
 
-Splunk Sentinel V2.0 utilizes 5 main persistent tables in its database schema. Migrations are stored in [supabase/migrations/20260615_init_schema.sql](supabase/migrations/20260615_init_schema.sql).
+Splunk Sentinel V2.0 maps persistent SOC records to 5 PostgreSQL tables. Migrations are located in [supabase/migrations/20260615_init_schema.sql](supabase/migrations/20260615_init_schema.sql).
 
 ### 1. `users`
 Profiles for user accounts linked to authentication IDs.
@@ -199,13 +238,36 @@ Chronological trails of user changes and actions in the SOC.
 
 ---
 
+## 🔁 Data Flow Architecture
+
+```
+Splunk Enterprise / Splunk Cloud
+      ↓
+Security Telemetry (raw web server logs, auth events, system traces)
+      ↓
+Splunk Sentinel Ingestion Layer (ingests logs via HEC API or file upload)
+      ↓
+AI Threat Analysis Engine (LLM-driven logical reasoning mapping threat vectors)
+      ↓
+Incident Correlation Engine (parses and structures timelines, severities, and targets)
+      ↓
+Sentinel Chat Coprocessor (interactive chat interface for deep forensic queries)
+      ↓
+Remediation Recommendations (issues custom actionable containment checklists)
+      ↓
+PDF Investigation Report (downloads executive-ready forensics and containment summary)
+```
+
+---
+
 ## 🚀 Installation & Setup
-1. Clone the repository:
+
+1. **Clone the Repository**:
    ```bash
    git clone https://github.com/ByteBlaze1706/Splunk-Sentinel.git
    cd Splunk-Sentinel
    ```
-2. Install dependencies:
+2. **Install Dependencies**:
    ```bash
    npm install
    ```
@@ -213,6 +275,7 @@ Chronological trails of user changes and actions in the SOC.
 ---
 
 ## 🔑 Environment Variables
+
 To connect to your database and enable live logic engines, create a `.env.local` file at the root:
 ```env
 # Supabase Persistence Credentials (Optional)
@@ -227,6 +290,7 @@ OPENAI_API_KEY=sk-proj-your-api-key-here
 ---
 
 ## 💻 Local Development
+
 Start the Next.js development server:
 ```bash
 npm run dev
@@ -236,10 +300,11 @@ Open `http://localhost:3000` to access the SOC terminal.
 ---
 
 ## 🌐 Deployment Guide
+
 This project is configured for one-click deployment on **Vercel**:
 
 ### Option 1: Vercel CLI (Recommended)
-1. Install the Vercel CLI:
+1. Install Vercel CLI:
    ```bash
    npm install -g vercel
    ```
@@ -255,4 +320,5 @@ This project is configured for one-click deployment on **Vercel**:
 ---
 
 ## 📄 License
+
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
